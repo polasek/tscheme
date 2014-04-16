@@ -9,10 +9,10 @@
   (make-generic-operator 1 'analyze
     (lambda (exp)
       (cond ((application? exp)
-	     (analyze-application exp))
-	    (else
-	     (error "Unknown expression type"
-		    exp))))))
+             (analyze-application exp))
+            (else
+             (error "Unknown expression type"
+                    exp))))))
 
 (define (analyze-self-evaluating exp)
   (lambda (env) exp))
@@ -55,8 +55,8 @@
         (aprocs (map analyze (operands exp))))
     (lambda (env)
       (execute-application (fproc env)
-	(map (lambda (aproc) (aproc env))
-	     aprocs)))))
+        (map (lambda (aproc) (aproc env))
+             aprocs)))))
 
 (define execute-application
   (make-generic-operator 2 'execute-application
