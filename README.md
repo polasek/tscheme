@@ -1,2 +1,3 @@
-Typed scheme
-============
+Type inference thingy for Scheme
+================================
+
