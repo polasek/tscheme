@@ -1,12 +1,6 @@
 Type inference thingy for Scheme
 ================================
 
-Polymorphic Types
------------------
-```
-*any*
-```
-
 Primitive Types
 ---------------
 ```
