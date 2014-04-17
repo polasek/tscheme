@@ -1,17 +1,27 @@
 Type inference thingy for Scheme
 ================================
 
-Core Types
-----------
+Polymorphic Types
+-----------------
 ```
+*any*
+```
+
+Primitive Types
+---------------
+```
+*any*
 boolean
 number
 string
 symbol
 pair
-list
-type-list
-type->type
-*any*
+```
+
+Complex Types
+-------------
+```
+function =
+  *list-of-arg-types*->*return-type*
 ```
 
