@@ -44,18 +44,14 @@ What this means: Internally, we are for each variable v keeping track of a
 on by v.  Let t be a type.  When we see a constraint of the form v REQUIRES t,
 we are saying:
 
-\[ U_v \subseteq t. \]
+U_v <= t.
 
 When we see a constraint of the form v PERMITS t, we are saying:
 
-$ U_v \cap t \neq \emptyset. $
+(U_v intersect t) is nonempty.
 
-Now suppose t is some kind of Type_reference other than a type.  Thus t refers
-to either a variable or an argument.  Then we think of "v REQUIRES t" as
-saying
+Now suppose t is some kind of Type_reference other than a type.  Thus t is
+either a variable or an argument.  Then we think of "v REQUIRES t" as saying
 
-$$ U_v \subseteq U_t. $$
+U_v <= U_t.
 
-Again, that is
-
-\\\[ U_v \\\]
