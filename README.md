@@ -44,14 +44,18 @@ What this means: Internally, we are for each variable v keeping track of a
 on by v.  Let t be a type.  When we see a constraint of the form v REQUIRES t,
 we are saying:
 
-\\[ U_v \subseteq t. \\]
+\[ U_v \subseteq t. \]
 
 When we see a constraint of the form v PERMITS t, we are saying:
 
-\\[ U_v \cap t \neq \emptyset. \\]
+$ U_v \cap t \neq \emptyset. $
 
 Now suppose t is some kind of Type_reference other than a type.  Thus t refers
 to either a variable or an argument.  Then we think of "v REQUIRES t" as
 saying
 
-\\[ U_v \subseteq U_t. \\]
+$$ U_v \subseteq U_t. $$
+
+Again, that is
+
+\\\[ U_v \\\]
