@@ -1,6 +1,6 @@
 
 (define (unify constraints)
-  error 'TODO)
+  (error 'TODO))
 
 (define *requires* 'REQUIRES)
 (define *permits*  'PERMITS)
