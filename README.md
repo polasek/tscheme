@@ -55,3 +55,10 @@ either a variable or an argument.  Then we think of "v REQUIRES t" as saying
 
 U_v <= U_t.
 
+_Note on variables_: A "variable" here is either a variable that occurs in the
+code being analyzed, or an internal identifier for a procedure (we might need
+names for lambdas which are anonymous in the code).  We keep a unique
+identifier for each lambda so that the arguments to the lambda can be
+referenced.
+
+
