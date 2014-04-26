@@ -8,6 +8,12 @@
     type?
     (name  type:name))
 
+;; Singleton type
+(define-record-type singleton
+    (singleton:make val)
+    singleton?
+    (name  singleton:val))
+
 ;; Type variable
 (define-record-type type-variable
     (var:make name)
@@ -21,10 +27,16 @@
     (relation  constraint:relation)
     (right     constraint:right))
 
-;;; Shortcuts for important instances
-
 (define *requires* 'REQUIRES)
 (define *permits*  'PERMITS)
+
+(define (requirement? constraint)
+  (and (constraint? constraint)
+       (eq? (constraint:relation constraint) *requires*)))
+
+(define (permission? constraint)
+  (and (constraint? constraint)
+       (eq? (constraint:relation constraint) *permits*)))
 
 (define *boolean*   (type:make 'boolean))
 (define *number*    (type:make 'number))
@@ -33,6 +45,13 @@
 (define *symbol*    (type:make 'symbol))
 (define *pair*      (type:make 'pair))
 (define *procedure* (type:make 'procedure))
+
+(define (type:boolean?   t) (and (type? t) (eq? t *boolean*)))
+(define (type:number?    t) (and (type? t) (eq? t *number*)))
+(define (type:char?      t) (and (type? t) (eq? t *char*)))
+(define (type:string?    t) (and (type? t) (eq? t *string*)))
+(define (type:pair?      t) (and (type? t) (eq? t *pair*)))
+(define (type:procedure? t) (and (type? t) (eq? t *procedure*)))
 
 ;;; Methods to construct instances
 
