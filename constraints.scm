@@ -27,8 +27,13 @@
     (relation  constraint:relation)
     (right     constraint:right))
 
+(define *equals*   'EQUALS)
 (define *requires* 'REQUIRES)
 (define *permits*  'PERMITS)
+
+(define (equality? constraint)
+  (and (constraint? constraint)
+       (eq? (constraint:relation constraint) *equals*)))
 
 (define (requirement? constraint)
   (and (constraint? constraint)
