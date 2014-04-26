@@ -47,7 +47,7 @@ we are saying:
 
 When we see a constraint of the form `v PERMITS t`, we are saying:
 
-`(U_v` intersect `t)` is nonempty.
+(`U_v` intersect `t`) is nonempty.
 
 Now suppose `t` is some kind of `Type_reference` other than a type.  Thus `t` is
 either a variable or an argument.  Then we think of `v REQUIRES t` as saying
