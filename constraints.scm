@@ -1,4 +1,10 @@
 
+(define **type-var-counter** 0)
+
+(define (fresh)
+  (set! **type-var-counter** (+ **type-var-counter** 1))
+  (symbol-append 'x **type-var-counter**))
+
 (define (unify constraints)
   (error 'TODO))
 
