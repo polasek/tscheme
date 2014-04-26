@@ -36,9 +36,8 @@ Var = <symbol>
 Arg = Var,Int
 
 Type_reference = (Var | Arg | Type)
-
-
 ```
+
 What this means: Internally, we are for each variable v keeping track of a
 "Type", which corresponds to the universe U_v of values that "could be" taken
 on by v.  Let t be a type.  When we see a constraint of the form v REQUIRES t,
@@ -60,5 +59,11 @@ code being analyzed, or an internal identifier for a procedure (we might need
 names for lambdas which are anonymous in the code).  We keep a unique
 identifier for each lambda so that the arguments to the lambda can be
 referenced.
+
+Assumptions
+-----------
+* Variable names are unique
+* Lambdas are given names during preprocessing
+
 
 
