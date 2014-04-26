@@ -64,6 +64,7 @@ Assumptions
 -----------
 * Variable names are unique
 * Lambdas are given names during preprocessing
+* Define does not create procedures, just binds names to lambdas
 
 
 
