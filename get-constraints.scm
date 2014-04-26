@@ -1,4 +1,5 @@
 (load "ghelper")
+(load "constraints")
 
 (define *procedure* 'procedure)
 ;; TODO have this actually be the right thing
