@@ -82,5 +82,3 @@
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
 
-(define (constraint:make-equal left right)
-  (constraint:make left *equals* right))
