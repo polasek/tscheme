@@ -12,7 +12,7 @@
 (define-record-type singleton
     (singleton:make val)
     singleton?
-    (name  singleton:val))
+    (val  singleton:val))
 
 ;; Type variable
 (define-record-type type-variable
