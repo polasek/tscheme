@@ -62,9 +62,16 @@
 
 ;; Fresh type variables
 (define **type-var-counter** 0)
-(define (fresh)
+(define (fresh #!optional prefix)
   (set! **type-var-counter** (+ **type-var-counter** 1))
-  (var:make (symbol-append 'x **type-var-counter**)))
+  (var:make (symbol-append (if (equal? prefix #!default)
+                             'x
+                             prefix)
+                           **type-var-counter**)))
+
+(define (fresh-argvar) (fresh 'argvar))
+(define (fresh-retvar) (fresh 'retvar))
+(define (fresh-procvar) (fresh 'proc))
 
 (define (constraint:make-equal left right)
   (constraint:make left *equals* right))
@@ -75,3 +82,5 @@
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
 
+(define (constraint:make-equal left right)
+  (constraint:make left *equals* right))
