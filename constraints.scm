@@ -66,6 +66,9 @@
   (set! **type-var-counter** (+ **type-var-counter** 1))
   (var:make (symbol-append 'x **type-var-counter**)))
 
+(define (constraint:make-equal left right)
+  (constraint:make left *equals* right))
+
 (define (constraint:make-require left right)
   (constraint:make left *requires* right))
 
