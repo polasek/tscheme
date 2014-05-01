@@ -1,23 +1,19 @@
 (load "constraints")
 
-(define (merge-types x y constraints)
-  (cond
-    ((and (not (type-variable? x)) (not (type-variable? y))) constraints)
-    ((and (not (type-variable? x)) (type-variable? y)) (merge-types y x constraints))
-    (else ; x is a type-variable, y could be anything
-      (let lp ((constraints constraints))
-        (if (null? constraints) '()
-          (let* ((c (car constraints))
-                 (new-c (cond ((equal? (constraint:left c) x)
-                               (constraint:make
-                                 y (constraint:relation c) (constraint:right c)))
-                              ((equal? (constraint:right c) x)
-                               (constraint:make
-                                 (constraint:left c) (constraint:relation c) y))
-                              (else c))))
-            (if (check-constraint new-c)
-                (cons new-c (lp (cdr constraints)))
-                (lp (cdr constraints)))))))))
+(define (substitute old new constraints env)
+  (let lp ((constraints constraints))
+    (if (null? constraints) '()
+      (let* ((c (car constraints))
+             (new-c (cond ((equal? (constraint:left c) old)
+                           (constraint:make
+                             new (constraint:relation c) (constraint:right c)))
+                          ((equal? (constraint:right c) old)
+                           (constraint:make
+                             (constraint:left c) (constraint:relation c) new))
+                          (else c))))
+        (if (check-constraint new-c)
+            (cons new-c (lp (cdr constraints)))
+            (lp (cdr constraints)))))))
 
 (define (check-constraint c)
   (if (not (constraint? c)) #f
