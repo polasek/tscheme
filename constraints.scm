@@ -7,6 +7,7 @@
     (relation  constraint:relation)
     (right     constraint:right))
 
+
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
   type?
@@ -39,9 +40,9 @@
 (define empty-environment '())
 (define (lookup-variable environment var) (assv var environment))
 (define (update-variable environment var type)
-  (cons (var . type) (del-assv var environment)))
+  (cons (list var type) (del-assv var environment)))
 (define (substitute-into-environment environment old new)
-  (map (lambda (mapping) ((car mapping) . (substitute-into-type (cadr mapping) old new)))
+  (map (lambda (mapping) (list (car mapping) (substitute-into-type (cadr mapping) old new)))
        environment))
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
