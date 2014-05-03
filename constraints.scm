@@ -108,6 +108,17 @@
 ;; (procedure (procedure all none))
 |#
 
+;;; Slightly cleaner
+(define (type-map f . types)
+  (type:make
+    (apply f (map type:boolean types))
+    (apply f (map type:number  types))
+    (apply f (map type:char    types))
+    (apply f (map type:string  types))
+    (apply f (map type:symbol  types))
+    (apply f (map type:pair    types))
+    (apply f (map type:procedure types))))
+
 (define (intersect-type type-tag typeA typeB)
   (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
 	((eqv? typeA *all*) typeB)
