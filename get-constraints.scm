@@ -311,4 +311,32 @@
   '((lambda (x y) (begin (+ x y))) 3 4))
 
 (print-recursive (get-constraints-for test3))
+
+;;; Complicated argument expressions.  And again, the scoping of x is done
+;;; correctly.
+(define test4
+  '(begin
+     (define x 3)
+     (+ (begin
+          9
+          ((lambda (x y)
+            5)))
+        (begin
+          (+ 7)
+          x))))
+
+(print-recursive (get-constraints-for test4))
+
+;;; Note the asymmetry: when we process (+ x (+ 1 2)), we get the constraints
+;;; that x requires (arg + 0), but (arg + 1) permits (ret +).  The current
+;;; logic is such that variables which are passed as arguments generate require
+;;; relations, but any other thing (e.g., a combination) passed as an argument
+;;; generates a permit relation.
+(define test5
+  '(begin
+     (define x 3)
+     (+ x (- 1 2))))
+
+(print-recursive (get-constraints-for test5))
+
 |#
