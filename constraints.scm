@@ -134,7 +134,9 @@
 	((eqv? typeA *all*) typeB)
 	((eqv? typeB *all*) typeA)
 	((eq? type-tag type:procedure)
-	 (raise "TODO intersect procedure types"))
+	 (raise "TODO intersect procedure types")) ;;This requires recursive
+	                                           ;;intersection. Should be returned
+	                                           ;;as a list of bindings to the caller?
 	(else (intersect-finite-sets typeA typeB))))
 
 (define (union-type type-tag typeA typeB)
@@ -152,7 +154,12 @@
   (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
-(define (lookup-variable environment var) (assv var environment))
+(define (lookup-variable environment var)
+  (let ((res (assv var environment)))
+    (if (eq? res #f)
+	type:top
+	res)))
+
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
 ;;Note: there is no need to follow symbolic links here, as they will
@@ -223,3 +230,54 @@
 
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
+
+(define (enforce-constraint:equals constraints environment left right)
+  (cond ((not (symbol? left)) (raise "TODO handle args"))
+	((eqv? left right) (list environment constraints))
+	(let* ((tA (lookup-variable environment left))
+	       (tB (if (symbol? right)
+		       (lookup-variable environment right)
+		       right))
+	       (newType (intersect tA tB)))
+	  (list (update-variable
+		 (if (symbol? right)
+		     (substitute-into-environment environment left right)
+		     environment)
+		 left
+		 newType)
+		(if (symbol? right)
+		    (substitute-constraints left right constraints)
+		    constraints)))))
+;;TODO Check if type is empty
+;;TODO add new constraints as we intersect or unify?
+;;If my understanding of the difference between equals and requires is correct,
+;;then the difference in the implementation is that if requires is of form
+;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, they should
+;;be the same, I think.
+;;TODO have one function with a switch at the right place to reduce
+;;code duplication
+
+(define (enforce-constraint:requires constraints environment left right)
+  (cond ((not (symbol? left)) (raise "TODO handle args"))
+	((eqv? left right) (list environment constraints))
+	(let* ((tA (lookup-variable environment left))
+	       (tB (if (symbol? right)
+		       (lookup-variable environment right)
+		       right))
+	       (newType (intersect tA tB)))
+	  (list (update-variable environment left newType)
+		constraints))))
+
+;;Permits should still be the same, requires that the intersection is nonempty but
+;;does not modify mappings
+(define (enforce-constraint:requires constraints environment left right)
+  (cond ((not (symbol? left)) (raise "TODO handle args"))
+	((eqv? left right) (list environment constraints))
+	(let* ((tA (lookup-variable environment left))
+	       (tB (if (symbol? right)
+		       (lookup-variable environment right)
+		       right))
+	       (newType (intersect tA tB)))
+	  ;;TODO enforce that newType is non-empty
+	  (list (update-variable environment left newType)
+		constraints))))
