@@ -89,6 +89,14 @@
 	      type:predicates))))
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
+;; #[type 65]
+;; (boolean (finite-set #f))
+;; (number (finite-set 1 2 3 9 32))
+;; (char none)
+;; (string none)
+;; (symbol (finite-set a b))
+;; (pair none)
+;; (procedure none)
 |#
 
 ;;Takes two finite sets of the same type
@@ -306,41 +314,14 @@
 ;;should be the same, I think. Permits then doesn't update any bindings whatsoever,
 ;;only checks that the intersections are non-empty.
 
-
 #|
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
 (pp (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
 			'() (constraint:make 'a *equals* 'b)))
-(pp (caadr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+(vector->list type:make-boolean)
+(display `(,type:make-boolean))
+
+(pp (caaddr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
 			       '() (constraint:make 'a *equals* 'b))))
-|#
-
-#|
-(define (enforce-constraint:requires constraints environment left right)
-  (cond ((not (symbol? left)) (error "TODO handle args"))
-	((eqv? left right) (list environment constraints))
-	(let* ((tA (lookup-variable environment left))
-	       (tB (if (symbol? right)
-		       (lookup-variable environment right)
-		       right))
-	       (newType (intersect tA tB)))
-	  (list (update-variable environment left newType)
-		constraints))))
-
-;;Permits should still be the same, requires that the intersection is nonempty but
-;;does not modify mappings
-(define (enforce-constraint:permits constraints environment left right)
-  (cond ((not (symbol? left)) (error "TODO handle args"))
-	((eqv? left right) (list environment constraints))
-	(let* ((tA (lookup-variable environment left))
-	       (tB (if (symbol? right)
-		       (lookup-variable environment right)
-		       right))
-	       (newType (intersect tA tB)))
-	  (if (type:empty? newType)
-	      ;;TODO enforcing that the returned type is not empty.
-	      ;;Should be added to enforce-constraint:equals
-	      (report-failure "There is no possible type for this variable")
-	      (list (update-variable environment left newType)
-		    constraints)))))
+(pp (constraint:make 'a *equals* 'b))
 |#
