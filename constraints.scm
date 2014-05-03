@@ -1,3 +1,5 @@
+(load "utils")
+
 ;;;; Core definitions of types and functions for working with constraints.
 
 (define-record-type constraint
@@ -11,10 +13,10 @@
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
   type?
-  (boolean type:boolean)
-  (number  type:number)
-  (char    type:char)
-  (string   type:string)
+  (boolean    type:boolean)
+  (number     type:number)
+  (char       type:char)
+  (string     type:string)
   (symbol     type:symbol)
   (pair       type:pair)
   (procedure  type:procedure))
@@ -22,33 +24,190 @@
 (define *none* 'none)
 (define *all*  'all)
 
+(define (type:none?) (eqv? obj *none*))
+(define (type:all?) (eqv? obj *all*))
+
+(define (make-finite-set% elts)
+  (if (null? elts)
+      *none*
+      (cons 'finite-set elts)))
+
+(define (type:finite-set? ob)
+  (and (list? obj)
+       (not (null? obj))
+       (eqv? (car obj) 'finite-set)))
+
 (define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
-(define type:boolean (type:make *all* *none* *none* *none* *none* *none* *none*))
+(define type:make-boolean (type:make *all*  *none* *none* *none* *none* *none* *none*))
+(define type:make-number  (type:make *none* *all*  *none* *none* *none* *none* *none*))
+(define type:make-char    (type:make *none* *none* *all*  *none* *none* *none* *none*))
+(define type:make-string  (type:make *none* *none* *none* *all*  *none* *none* *none*))
+(define type:make-symbol  (type:make *none* *none* *none* *none* *all*  *none* *none*))
+(define type:make-pair    (type:make *none* *none* *none* *none* *none* *all*  *none*))
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
 ;;appropriate fields of the type record
-(define (type:finite-set . elts) (raise "TODO type:finite-set"))
+#|
+(define (type:finite-set . elts)
+  (define (sort-to-bins e bins)
+    (cond ((boolean? e) (vector-set! bins 0 (cons e (vector-ref bins 0))))
+          ((number?  e) (vector-set! bins 1 (cons e (vector-ref bins 1))))
+          ((char?    e) (vector-set! bins 2 (cons e (vector-ref bins 2))))
+          ((string?  e) (vector-set! bins 3 (cons e (vector-ref bins 3))))
+          ((symbol?  e) (vector-set! bins 4 (cons e (vector-ref bins 4))))
+          ((pair?    e) (vector-set! bins 5 (cons e (vector-ref bins 5)))))
+    bins)
+  (define (sort-within-bin lst)
+    (if (null? lst)
+        *none*
+        (make-finite-set% (dedup (general-sort lst)))))
+  (let ((bins (vector-map
+                (fold-right sort-to-bins '#( () () () () () () ) elts)
+                sort-within-bin)))
+    (type:make (vector-ref bins 0)
+               (vector-ref bins 1)
+               (vector-ref bins 2)
+               (vector-ref bins 3)
+               (vector-ref bins 4)
+               (vector-ref bins 5)
+               *none*)))
+|#
+;;I don't think we ever want pairs or procedures to be parts of finite-list
+(define type:predicates
+  (list boolean? number? char? string? symbol? (lambda (x) #f) (lambda (x) #f)))
+(define (type:finite-set . elts) 
+  (if (not (null? (fold-right ;;Check that elements are of the correct types   
+		   (lambda (type-pred lst) (list-transform-negative lst type-pred))		  
+		   elts
+		   type:predicates)))
+      (error "Provided list contains elements that cannot be part of a finite set")
+      (apply type:make ;;The method itself; for each type, filter out
+	     (map      ;;the corresponging elements, sort and deduplicate them.
+	      (lambda (type-pred)
+		(make-finite-set%
+		 (dedup (general-sort (list-transform-positive elts type-pred)))))
+	      type:predicates))))
+#|
+(pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
+|#
 
 ;;Takes two finite sets of the same type
-(define (intersect-finite-sets setA setB) (raise "TODO intersect-finite-sets"))
-(define (union-finite-sets setA setB) (raise "TODO union-finite-sets"))
+(define (intersect-finite-sets setA setB)
+  (make-finite-set%
+        (general-sort (filter (lambda (e) (memv e setB)) setA))))
 
-(define (intersect typeA typeB) (raise "TODO intersect"))
-(define (union typeA typeB) (raise "TODO union"))
+(define (union-finite-sets setA setB)
+  (make-finite-set%
+        (dedup (general-sort (append (cdr setA) (cdr setB))))))
+
+;;A generic map over any record type
+;;Dangerous and order-dependent, but compact
+(define (record-map ordered-accessors)
+  (lambda (f . types)
+    (apply type:make (map (lambda (acc) (apply f (map acc types))) ordered-accessors))))
+(define (record-tagged-map ordered-accessors)
+  (lambda (f . types)
+    (apply type:make (map (lambda (acc) (apply f (cons acc (map acc types)))) ordered-accessors))))
+
+(define type:accessors
+  (list type:boolean type:number type:char type:string type:symbol type:pair type:procedure))
+
+(define (type:empty? type)
+  (for-all?
+   (map (lambda (acc) (acc type)) type:accessors)
+   (lambda (t) (eq? t *none*))))
+
+(define type:map (record-map type:accessors))
+(define type:tagged-map (record-tagged-map type:accessors))
+
+#|
+(pp (type:tagged-map list type:top type:make-boolean))
+;; #[type 21]
+;; (boolean (boolean all all))
+;; (number (number all none))
+;; (char (char all none))
+;; (string (string all none))
+;; (symbol (symbol all none))
+;; (pair (pair all none))
+;; (procedure (procedure all none))
+
+(map type:boolean (list type:top type:make-boolean))
+|#
+
+;; A placeholder for type failure. Will probably have additional arguments later.
+(define (report-failure msg)
+  (error msg))
+
+;; Requires recursive execution on procedure arguments and return types, if present.
+;; This method is non-recursive and ignores those - they are handled separately.
+(define (intersect-type type-tag typeA typeB)
+  (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
+	((eqv? typeA *all*) typeB)
+	((eqv? typeB *all*) typeA)
+	((eq? type-tag type:procedure) ;;At this point, we know both are lists
+	 (if (!= (length typeA) (length typeB))
+	     (report-failure "Cannot unify: procedures have different number of arguments")
+	     typeA)) ;;Simply return the first one. TODO make sure this is correct
+	(else (intersect-finite-sets typeA typeB))))
+
+;;Collect pairs of type variables from procedure types that have to be
+;;dealt with.
+(define (collect-proc-types typeA typeB)
+  (let* ((pA (type:procedure typeA))
+	 (pB (type:procedure typeB)))
+    (if (and (list? pA) (list? pB))
+	(list-transform-positive
+	  (map (lambda (tvarA tvarB) (if (eqv? tvarA tvarB) #t (list tvarA tvarB))) pA pB)
+	  symbol?)
+	'())))
+
+(define (union-type type-tag typeA typeB)
+  (cond ((or (eqv? typeA *all*) (eqv? typeB *all*)) *all*)
+	((eqv? typeA *none*) typeB)
+	((eqv? typeB *none*) typeA)
+	((eq? type-tag type:procedure)
+	 (error "TODO union procedure types")) ;;TODO rewrite similarly as intersect-type
+	(else (union-finite-sets typeA typeB))))
+
+;;Computes the intersection of two types, does not recurse on function arguments/return types
+(define (intersect typeA typeB)
+  (type:tagged-map intersect-type typeA typeB))
+(define (union typeA typeB)
+  (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
-(define (lookup-variable environment var) (assv var environment))
+(define (lookup-variable environment var)
+  (let ((res (assv var environment)))
+    (if (eq? res #f)
+	type:top
+	res)))
+
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping) (list (car mapping) (substitute-into-type (cadr mapping) old new)))
        environment))
 
+(define (substitute-into-type type old new)
+  (type:tagged-map (lambda (tag t)
+		     ;;Type variables can only appear in the procedure field
+		     (if (and (eq? tag type:procedure) (list? t))
+			 (map (lambda (tvar) (if (eqv? tvar old)
+						 new
+						 tvar))
+			      t)
+			 t))
+		   type))
+
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
-(define (type:procedure ret-tv arg-tvs)
+;;A naming conflict!
+;;TODO check other files for type:procedure
+;;Renamed from type:procedure to type:make-procedure
+(define (type:make-procedure ret-tv arg-tvs)
   (type:make *none* *none* *none* *none* *none* *none* (cons ret-tv arg-tvs)))
-(define type:any-procedure
+;;Renamed from type:procedure to type:make-any-procedure
+(define type:make-any-procedure
   (type:make *none* *none* *none* *none* *none* *none* *all*))
 
 
@@ -92,3 +251,94 @@
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
 
+;;TODO I am not entirely sure about adding constraints this way. I think it
+;;should work for requires and equals, it might not work for permits in some
+;;cases.
+;;As we might loop over the constraints and look for a fix point, we
+;;probably should not be adding these constraints in but should only process
+;;them.
+;;Processes one constraint passed as the constraint argument,
+;;doesn't examine other constraints (only substitutes into them, if appropriate).
+;:I factored the code out so that it handles all types of constraints, although
+;;it is probably just more confusing and complicated now.
+(define (enforce-constraint constraints environment constraint)
+  (let* ((left  (constraint:left     constraint))
+	 (right (constraint:right    constraint))
+	 (ctype (constraint:relation constraint)))
+    (cond ((not (symbol? left)) (error "TODO handle ret and args"))
+	  ;;Two of the same variable, always fine
+	  ((eqv? left right) (list environment constraints))
+	  (else (let* ((tA (lookup-variable environment left))
+		       (tB (if (symbol? right)
+			       (lookup-variable environment right)
+			       right))
+		       (newType (intersect tA tB))
+		       ;;In the case of permits, simply adding these new relations is
+		       ;;not correct. TODO fix that.
+		       (newConstraints
+			(if (or (eq? ctype *equals*) 
+				(eq? ctype *requires*))
+			    ;;Collect aditional constraints and add them
+			    (append (map
+				     (lambda (lr)
+				       (constraint:make (car lr) ctype (cadr lr)))
+				     (collect-proc-types tA tB))
+				    constraints)
+			    constraints)))
+		  (if (type:empty? newType)
+		      ;;TODO enforcing that the returned type is not empty.
+		      (report-failure "There is no possible type for this variable")		
+		      (list (update-variable ;;Update variable binding if not permits
+			     ;;Update environment if equals
+			     (if (and (eq? ctype *equals*) (symbol? right))
+				 (substitute-into-environment environment left right)
+				 environment)
+			     left
+			     (if (eq? ctype *permits*) tA newType))
+			    (if (and (eq? ctype *equals*) (symbol? right))
+				(substitute-constraints left right newConstraints)
+				constraints))))))))
+;;If my understanding of the difference between equals and requires is correct,
+;;then the difference in the implementation is that if requires is of form
+;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, the two
+;;should be the same, I think. Permits then doesn't update any bindings whatsoever,
+;;only checks that the intersections are non-empty.
+
+
+#|
+(pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
+(pp (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+			'() (constraint:make 'a *equals* 'b)))
+(pp (caadr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+			       '() (constraint:make 'a *equals* 'b))))
+|#
+
+#|
+(define (enforce-constraint:requires constraints environment left right)
+  (cond ((not (symbol? left)) (error "TODO handle args"))
+	((eqv? left right) (list environment constraints))
+	(let* ((tA (lookup-variable environment left))
+	       (tB (if (symbol? right)
+		       (lookup-variable environment right)
+		       right))
+	       (newType (intersect tA tB)))
+	  (list (update-variable environment left newType)
+		constraints))))
+
+;;Permits should still be the same, requires that the intersection is nonempty but
+;;does not modify mappings
+(define (enforce-constraint:permits constraints environment left right)
+  (cond ((not (symbol? left)) (error "TODO handle args"))
+	((eqv? left right) (list environment constraints))
+	(let* ((tA (lookup-variable environment left))
+	       (tB (if (symbol? right)
+		       (lookup-variable environment right)
+		       right))
+	       (newType (intersect tA tB)))
+	  (if (type:empty? newType)
+	      ;;TODO enforcing that the returned type is not empty.
+	      ;;Should be added to enforce-constraint:equals
+	      (report-failure "There is no possible type for this variable")
+	      (list (update-variable environment left newType)
+		    constraints)))))
+|#
