@@ -28,9 +28,6 @@
     (if (null? lst)
         lst
 	(lp (car lst) (cdr lst)))))
-#|
-
-#|
 
 ;;; This is to keep the Scheme printer from going into an infinite
 ;;; loop if you try to print a circular data structure, such as an

@@ -37,8 +37,8 @@
        (not (null? obj))
        (eqv? (car obj) 'finite-set)))
 
-(define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
-(define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
+(define type:empty        (type:make *none* *none* *none* *none* *none* *none* *none*))
+(define type:top          (type:make *all*  *all*  *all*  *all*  *all*  *all*  *all*))
 (define type:make-boolean (type:make *all*  *none* *none* *none* *none* *none* *none*))
 (define type:make-number  (type:make *none* *all*  *none* *none* *none* *none* *none*))
 (define type:make-char    (type:make *none* *none* *all*  *none* *none* *none* *none*))
