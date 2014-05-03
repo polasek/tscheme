@@ -80,7 +80,7 @@
 		   (lambda (type-pred lst) (list-transform-negative lst type-pred))		  
 		   elts
 		   type:predicates)))
-      (raise "Provided list contains elements that cannot be part of a finite set")
+      (error "Provided list contains elements that cannot be part of a finite set")
       (apply type:make ;;The method itself; for each type, filter out
 	     (map      ;;the corresponging elements, sort and deduplicate them.
 	      (lambda (type-pred)
@@ -112,6 +112,11 @@
 (define type:accessors
   (list type:boolean type:number type:char type:string type:symbol type:pair type:procedure))
 
+(define (type:empty? type)
+  (for-all?
+   (map (lambda (acc) (acc type)) type:accessors)
+   (lambda (t) (eq? t *none*))))
+
 (define type:map (record-map type:accessors))
 (define type:tagged-map (record-tagged-map type:accessors))
 
@@ -129,25 +134,42 @@
 (map type:boolean (list type:top type:make-boolean))
 |#
 
+;; A placeholder for type failure. Will probably have additional arguments later.
+(define (report-failure msg)
+  (error msg))
+
+;; Requires recursive execution on procedure arguments and return types, if present.
+;; This method is non-recursive and ignores those - they are handled separately.
 (define (intersect-type type-tag typeA typeB)
   (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
 	((eqv? typeA *all*) typeB)
 	((eqv? typeB *all*) typeA)
-	((eq? type-tag type:procedure)
-	 (raise "TODO intersect procedure types")) ;;This requires recursive
-	                                           ;;intersection. Should be returned
-	                                           ;;as a list of bindings to the caller?
+	((eq? type-tag type:procedure) ;;At this point, we know both are lists
+	 (if (!= (length typeA) (length typeB))
+	     (report-failure "Cannot unify: procedures have different number of arguments")
+	     typeA)) ;;Simply return the first one. TODO make sure this is correct
 	(else (intersect-finite-sets typeA typeB))))
+
+;;Collect pairs of type variables from procedure types that have to be
+;;dealt with.
+(define (collect-proc-types typeA typeB)
+  (let* ((pA (type:procedure typeA))
+	 (pB (type:procedure typeB)))
+    (if (and (list? pA) (list? pB))
+	(list-transform-positive
+	  (map (lambda (tvarA tvarB) (if (eqv? tvarA tvarB) #t (list tvarA tvarB))) pA pB)
+	  symbol?)
+	'())))
 
 (define (union-type type-tag typeA typeB)
   (cond ((or (eqv? typeA *all*) (eqv? typeB *all*)) *all*)
 	((eqv? typeA *none*) typeB)
 	((eqv? typeB *none*) typeA)
 	((eq? type-tag type:procedure)
-	 (raise "TODO union procedure types"))
+	 (error "TODO union procedure types")) ;;TODO rewrite similarly as intersect-type
 	(else (union-finite-sets typeA typeB))))
 
-;;Computes the intersection of two types
+;;Computes the intersection of two types, does not recurse on function arguments/return types
 (define (intersect typeA typeB)
   (type:tagged-map intersect-type typeA typeB))
 (define (union typeA typeB)
@@ -231,14 +253,22 @@
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
 
+;;TODO I am not entirely sure about adding constraints this way. I think it should work the same
+;;way for all the three constraint types though, in which case we should have this method generic
+;;and work with all constraint types, as the code is mostly similar.
 (define (enforce-constraint:equals constraints environment left right)
-  (cond ((not (symbol? left)) (raise "TODO handle args"))
-	((eqv? left right) (list environment constraints))
+  (cond ((not (symbol? left)) (error "TODO handle args"))
+	((eqv? left right) (list environment constraints))       
 	(let* ((tA (lookup-variable environment left))
 	       (tB (if (symbol? right)
 		       (lookup-variable environment right)
 		       right))
-	       (newType (intersect tA tB)))
+	       (newType (intersect tA tB))
+	       (newConstraints (append (map ;;Collect aditional constraints and add them
+					(lambda (lr)
+					  (constraint:make-equal (car lr) (cadr lr)))
+					(collect-proc-types tA tB) )
+				       constraints))
 	  (list (update-variable
 		 (if (symbol? right)
 		     (substitute-into-environment environment left right)
@@ -246,10 +276,9 @@
 		 left
 		 newType)
 		(if (symbol? right)
-		    (substitute-constraints left right constraints)
+		    (substitute-constraints left right newConstraints)
 		    constraints)))))
 ;;TODO Check if type is empty
-;;TODO add new constraints as we intersect or unify?
 ;;If my understanding of the difference between equals and requires is correct,
 ;;then the difference in the implementation is that if requires is of form
 ;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, they should
@@ -258,7 +287,7 @@
 ;;code duplication
 
 (define (enforce-constraint:requires constraints environment left right)
-  (cond ((not (symbol? left)) (raise "TODO handle args"))
+  (cond ((not (symbol? left)) (error "TODO handle args"))
 	((eqv? left right) (list environment constraints))
 	(let* ((tA (lookup-variable environment left))
 	       (tB (if (symbol? right)
@@ -270,14 +299,20 @@
 
 ;;Permits should still be the same, requires that the intersection is nonempty but
 ;;does not modify mappings
-(define (enforce-constraint:requires constraints environment left right)
-  (cond ((not (symbol? left)) (raise "TODO handle args"))
+(define (enforce-constraint:permits constraints environment left right)
+  (cond ((not (symbol? left)) (error "TODO handle args"))
 	((eqv? left right) (list environment constraints))
 	(let* ((tA (lookup-variable environment left))
 	       (tB (if (symbol? right)
 		       (lookup-variable environment right)
 		       right))
 	       (newType (intersect tA tB)))
-	  ;;TODO enforce that newType is non-empty
-	  (list (update-variable environment left newType)
-		constraints))))
+	  (if (type:empty? newType)
+	      ;;TODO enforcing that the returned type is not empty.
+	      ;;Should be added to enforce-constraint:equals
+	      (report-failure "There is no possible type for this variable")
+	      (list (update-variable environment left newType)
+		    constraints)))))
+
+;;TODO enforcing that the returned type is not empty.
+;;Should be added to enforce-constraint:equals
