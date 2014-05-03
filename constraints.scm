@@ -1,3 +1,5 @@
+(load "utils")
+
 ;;;; Core definitions of types and functions for working with constraints.
 
 (define-record-type constraint
@@ -55,7 +57,7 @@
   (define (sort-within-bin lst)
     (if (null? lst)
         *none*
-        (make-finite-set% (general-sort (delete-duplicates lst)))))
+        (make-finite-set% (dedup (general-sort lst)))))
   (let ((bins (vector-map
                 (fold-right sort-to-bins '#( () () () () () () ) elts)
                 sort-within-bin)))
@@ -76,12 +78,11 @@
 		   elts
 		   type:predicates)))
       (raise "Provided list contains elements that cannot be part of a finite set")
-      (apply type:make ;;The method itself
-	     (map
+      (apply type:make ;;The method itself; for each type, filter out
+	     (map      ;;the corresponging elements, sort and deduplicate them.
 	      (lambda (type-pred)
 		(make-finite-set%
-		 (general-sort
-		  (delete-duplicates (list-transform-positive elts type-pred)))))
+		 (dedup (general-sort (list-transform-positive elts type-pred)))))
 	      type:predicates))))
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
@@ -94,7 +95,7 @@
 
 (define (union-finite-sets setA setB)
   (make-finite-set%
-        (general-sort (remove-duplicates (append (cdr setA) (cdr setB))))))
+        (dedup (general-sort (append (cdr setA) (cdr setB))))))
 
 ;;A generic map over any record type
 ;;Dangerous and order-dependent, but compact
@@ -151,6 +152,8 @@
 (define (lookup-variable environment var) (assv var environment))
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
+;;Note: there is no need to follow symbolic links here, as they will
+;;be substituted for as well.
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping)
 	 ((car mapping) . (substitute-into-type (cadr mapping) old new)))
