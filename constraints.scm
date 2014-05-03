@@ -256,6 +256,9 @@
 ;;TODO I am not entirely sure about adding constraints this way. I think it
 ;;should work for requires and equals, it might not work for permits in some
 ;;cases.
+;;As we might loop over the constraints and look for a fix point, we
+;;probably should not be adding these constraints in but should only process
+;;them.
 ;;Processes one constraint passed as the constraint argument,
 ;;doesn't examine other constraints (only substitutes into them, if appropriate).
 ;:I factored the code out so that it handles all types of constraints, although
