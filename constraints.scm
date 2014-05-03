@@ -26,7 +26,10 @@
 (define (type:none?) (eqv? obj *none*))
 (define (type:all?) (eqv? obj *all*))
 
-(define (make-finite-set% elts) (cons 'finite-set elts))
+(define (make-finite-set% elts)
+  (if (null? elts)
+      *none*
+      (cons 'finite-set elts)))
 
 (define (type:finite-set? ob)
   (and (list? obj)
