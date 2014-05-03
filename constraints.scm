@@ -253,39 +253,66 @@
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
 
-;;TODO I am not entirely sure about adding constraints this way. I think it should work the same
-;;way for all the three constraint types though, in which case we should have this method generic
-;;and work with all constraint types, as the code is mostly similar.
-(define (enforce-constraint:equals constraints environment left right)
-  (cond ((not (symbol? left)) (error "TODO handle args"))
-	((eqv? left right) (list environment constraints))       
-	(let* ((tA (lookup-variable environment left))
-	       (tB (if (symbol? right)
-		       (lookup-variable environment right)
-		       right))
-	       (newType (intersect tA tB))
-	       (newConstraints (append (map ;;Collect aditional constraints and add them
-					(lambda (lr)
-					  (constraint:make-equal (car lr) (cadr lr)))
-					(collect-proc-types tA tB) )
-				       constraints))
-	  (list (update-variable
-		 (if (symbol? right)
-		     (substitute-into-environment environment left right)
-		     environment)
-		 left
-		 newType)
-		(if (symbol? right)
-		    (substitute-constraints left right newConstraints)
-		    constraints)))))
-;;TODO Check if type is empty
+;;TODO I am not entirely sure about adding constraints this way. I think it
+;;should work for requires and equals, it might not work for permits in some
+;;cases.
+;;Processes one constraint passed as the constraint argument,
+;;doesn't examine other constraints (only substitutes into them, if appropriate).
+;:I factored the code out so that it handles all types of constraints, although
+;;it is probably just more confusing and complicated now.
+(define (enforce-constraint constraints environment constraint)
+  (let* ((left  (constraint:left     constraint))
+	 (right (constraint:right    constraint))
+	 (ctype (constraint:relation constraint)))
+    (cond ((not (symbol? left)) (error "TODO handle ret and args"))
+	  ;;Two of the same variable, always fine
+	  ((eqv? left right) (list environment constraints))
+	  (else (let* ((tA (lookup-variable environment left))
+		       (tB (if (symbol? right)
+			       (lookup-variable environment right)
+			       right))
+		       (newType (intersect tA tB))
+		       ;;In the case of permits, simply adding these new relations is
+		       ;;not correct. TODO fix that.
+		       (newConstraints
+			(if (or (eq? ctype *equals*) 
+				(eq? ctype *requires*))
+			    ;;Collect aditional constraints and add them
+			    (append (map
+				     (lambda (lr)
+				       (constraint:make (car lr) ctype (cadr lr)))
+				     (collect-proc-types tA tB))
+				    constraints)
+			    constraints)))
+		  (if (type:empty? newType)
+		      ;;TODO enforcing that the returned type is not empty.
+		      (report-failure "There is no possible type for this variable")		
+		      (list (update-variable ;;Update variable binding if not permits
+			     ;;Update environment if equals
+			     (if (and (eq? ctype *equals*) (symbol? right))
+				 (substitute-into-environment environment left right)
+				 environment)
+			     left
+			     (if (eq? ctype *permits*) tA newType))
+			    (if (and (eq? ctype *equals*) (symbol? right))
+				(substitute-constraints left right newConstraints)
+				constraints))))))))
 ;;If my understanding of the difference between equals and requires is correct,
 ;;then the difference in the implementation is that if requires is of form
-;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, they should
-;;be the same, I think.
-;;TODO have one function with a switch at the right place to reduce
-;;code duplication
+;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, the two
+;;should be the same, I think. Permits then doesn't update any bindings whatsoever,
+;;only checks that the intersections are non-empty.
 
+
+#|
+(pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
+(pp (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+			'() (constraint:make 'a *equals* 'b)))
+(pp (caadr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+			       '() (constraint:make 'a *equals* 'b))))
+|#
+
+#|
 (define (enforce-constraint:requires constraints environment left right)
   (cond ((not (symbol? left)) (error "TODO handle args"))
 	((eqv? left right) (list environment constraints))
@@ -313,6 +340,4 @@
 	      (report-failure "There is no possible type for this variable")
 	      (list (update-variable environment left newType)
 		    constraints)))))
-
-;;TODO enforcing that the returned type is not empty.
-;;Should be added to enforce-constraint:equals
+|#
