@@ -35,12 +35,12 @@
 
 (define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
-(define type:make-boolean (type:make *all* *none* *none* *none* *none* *none* *none*))
-(define type:make-number  (type:make *none* *all* *none* *none* *none* *none* *none*))
-(define type:make-char    (type:make *none* *all* *none* *none* *none* *none* *none*))
-(define type:make-string  (type:make *none* *all* *none* *none* *none* *none* *none*))
-(define type:make-symbol  (type:make *none* *all* *none* *none* *none* *none* *none*))
-(define type:make-pair    (type:make *none* *all* *none* *none* *none* *none* *none*))
+(define type:make-boolean (type:make *all*  *none* *none* *none* *none* *none* *none*))
+(define type:make-number  (type:make *none* *all*  *none* *none* *none* *none* *none*))
+(define type:make-char    (type:make *none* *none* *all*  *none* *none* *none* *none*))
+(define type:make-string  (type:make *none* *none* *none* *all*  *none* *none* *none*))
+(define type:make-symbol  (type:make *none* *none* *none* *none* *all*  *none* *none*))
+(define type:make-pair    (type:make *none* *none* *none* *none* *none* *all*  *none*))
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
 ;;appropriate fields of the type record
