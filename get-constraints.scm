@@ -1,7 +1,26 @@
 (load "ghelper")
 (load "constraints")
 
+;;; Temporary stuff, just so I can get print-outs
+(define (singleton:make x)
+  (list 'singleton x))
+(define *procedure* 'procedure)
+(define (tscheme:make-proc-type ret-tv arg-tvs)
+  (cons 'procedure: (cons ret-tv arg-tvs)))
+
+;;; Setup
 (define *the-constraints* '())
+
+(define *base-cvmap*
+  '((+ plus)
+    (string-append string-append)
+    (- minus)))
+
+(define (get-constraints-for expr)
+  (fluid-let ((*the-constraints* '())
+              (**type-var-counter** 0))
+    (tscheme:process-expr expr *base-cvmap*)
+    *the-constraints*))
 
 (define (add-constraint constraint)
   (set! *the-constraints* (cons constraint *the-constraints*)))
@@ -13,13 +32,19 @@
     (cvmap  tv&cvmap:cvmap  tv&cvmap:set-cvmap!))
 
 (define (cvmap:make)
-  '())
+  *base-cvmap*)
 
 (define (cvmap:bind cvmap key val)
   (cons `(,key ,val) cvmap))
 
-(define (cvmap:lookup cvmap key)
-  (assoc key cvmap))
+(define (cvmap:lookup key cvmap)
+  (let ((record (assoc key cvmap)))
+   (if record
+     (cadr record)
+     (begin
+       (display "Warning: failed to look up key in cvmap: ")
+       (pp key)
+       #f))))
 
 
 
@@ -73,7 +98,7 @@
   (caddr expr))
 
 (define (variable? expr)
-  symbol? expr)
+  (symbol? expr))
 
 (define (application-operator expr)
   (if (or (not (list? expr))
@@ -86,7 +111,7 @@
 
 (define tscheme:process-expr
   (make-generic-operator 2
-                         'type-produced
+                         'tscheme:process-expr
                          (lambda (expr cvmap)
                            (tscheme:process-application expr cvmap))))
 
@@ -96,6 +121,11 @@
                                           (singleton:make expr)))
    (tv&cvmap:make tv cvmap)))
 
+#|
+(define x (tscheme:process-self-quoting 3 '()))
+
+|#
+
 (defhandler tscheme:process-expr tscheme:process-self-quoting number?)
 (defhandler tscheme:process-expr tscheme:process-self-quoting string?)
 
@@ -103,7 +133,9 @@
   (let ((lambda-tv (fresh-procvar))
         (ret-tv (fresh-retvar))
         (arg-tvs '())
-        (inner-cvmap cvmap))
+        (outer-cvmap cvmap)    ; outer-cvmap will not be mutated
+        (inner-cvmap cvmap))   ; inner-cvmap will get mutated (the pointer, not
+                               ; the object itself)
     ;; Crappy way to do this, but I can't think of a better one right now
     (let lp ((remaining-args (lambda-arglist expr)))
      (if (null? remaining-args)
@@ -127,7 +159,7 @@
 
     ;; We use the outer cvmap because the bindings within the body of that
     ;; lambda are not relevant to code outside the body
-    (tv&cvmap:make tv inner-cvmap)))
+    (tv&cvmap:make lambda-tv outer-cvmap)))
   
 (defhandler tscheme:process-expr tscheme:process-lambda lambda?)
 
@@ -150,14 +182,17 @@
 (defhandler tscheme:process-expr tscheme:process-begin begin?)
 
 (define (tscheme:process-define expr cvmap)
-  (let ((tv&cvmap (tscheme:process-expr (define-rhs expr))))
-   (tv&cvmap:bind (define-lhs expr)
-                  (tv&cvmap:tv tv&cvmap))))
+  (let ((tv&cvmap (tscheme:process-expr (define-rhs expr) cvmap)))
+   (tv&cvmap:make
+     (define-lhs expr)
+     (cvmap:bind (tv&cvmap:cvmap tv&cvmap)
+                 (define-lhs expr)
+                 (tv&cvmap:tv tv&cvmap)))))
 
 (defhandler tscheme:process-expr tscheme:process-define define?)
 
 (define (tscheme:process-variable expr cvmap)
-  (let ((tv (cvmap:lookup expr)))
+  (let ((tv (cvmap:lookup expr cvmap)))
    (tv&cvmap:make (if tv
                     tv
                     (error "Unknown code variable" expr))
@@ -175,7 +210,7 @@
 ;;; Otherwise, (arg operator i) permits x.
 (define (tscheme:process-application expr cvmap)
   (let* ((operator-tv&cvmap
-           (tscheme:process-expr (application-operator expr)))
+           (tscheme:process-expr (application-operator expr) cvmap))
          (operator-tv (tv&cvmap:tv operator-tv&cvmap))
          (return-tv (fresh)))
     (add-constraint
@@ -195,18 +230,85 @@
                (arg-value-cvmap (tv&cvmap:cvmap arg-value-tv&cvmap))
                (arg-tv (arg-of operator-tv i)))
           (add-constraint
-            (if (variable? arg)
+            (if (variable? arg-value-expr)
               (constraint:make-require arg-value-tv
                                        arg-tv)
               (constraint:make-permit arg-tv
                                       arg-value-tv)))
           (lp (+ i 1)
               (cdr remaining-args)
-              (arg-value-cvmap)))))))
+              arg-value-cvmap))))))
               
 
 (define (return-type tv)
   (list 'ret tv))
 
 (define (arg-of tv num)
-  (list 'arg typeref num))
+  (list 'arg tv num))
+
+(define (display-constraint constraint)
+  (display "CONSTRAINT(")
+  (display (constraint:left constraint))
+  (display " ")
+  (display (constraint:relation constraint))
+  (display " ")
+  (display (constraint:right constraint))
+  (display ")"))
+
+(define (print-constraint constraint)
+  (display-constraint constraint)
+  (newline))
+
+#|
+(print-constraint (constraint:make-require 'a 'b))
+|#
+
+(define (print-recursive x)
+  (define (print-recursive-with-prefix y prefix)
+    (cond ((list? y)
+           (let ((new-prefix (string-append "   " prefix)))
+            (display prefix)
+            (display "(")
+            (newline)
+            (for-each (lambda (elt)
+                        (print-recursive-with-prefix elt new-prefix))
+                      y)
+            (display prefix)
+            (display ")")
+            (newline)))
+          ((constraint? y) (display prefix) (print-constraint y))
+          (else (display prefix) (write-line y))))
+  (print-recursive-with-prefix x ""))
+
+#|
+(print-recursive `(a b (,(constraint:make-require 1 2) (d)) e))
+|#
+
+#|
+(define test1
+  '(lambda (x y)
+     (begin
+       (+ x 5)
+       (string-append y "a b"))))
+
+(print-recursive (get-constraints-for test1))
+
+;;; The key thing to note here is that the code variable corresponding to x in
+;;; (- x 1) is the same one as in (+ x 1), but is different from the one in
+;;; (string-append x "a").
+(define test2
+  '(begin
+     (define x 3)
+     (+ x 1)
+     (lambda (x)
+       (string-append x "a"))
+     (- x 1)))
+
+(print-recursive (get-constraints-for test2))
+
+;;; Applying anonymous lambdas
+(define test3
+  '((lambda (x y) (begin (+ x y))) 3 4))
+
+(print-recursive (get-constraints-for test3))
+|#
