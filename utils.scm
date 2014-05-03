@@ -1,5 +1,16 @@
 (declare (usual-integrations))
 
+;; TODO: Make generic
+(define (general-sort lst)
+  (define (boolean<? a b) (not (and a b)))
+  (cond
+    ((null? lst) lst)
+    ((boolean? (car lst)) (sort lst boolean<?))
+    ((number?  (car lst)) (sort lst <))
+    ((char?    (car lst)) (sort lst char<?))
+    ((string?  (car lst)) (sort lst string<?))
+    ((symbol?  (car lst)) (sort lst symbol<?))
+    (else lst)))
 
 (define (identity x) x)
 
