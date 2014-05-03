@@ -11,6 +11,13 @@
                (else c)))
        constraints))
 
+#|
+(pp 
+ (cadr
+  (substitute-constraints 'a 'b `(,(constraint:make 'a 'equals 'b) ,(constraint:make 'b 'equals 'a)))))
+
+|#
+
 (define (substitute old new constraints env)
   (let lp ((constraints constraints))
     (if (null? constraints) '()
