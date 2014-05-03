@@ -9,6 +9,7 @@
     (relation  constraint:relation)
     (right     constraint:right))
 
+
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
   type?
@@ -192,11 +193,8 @@
 
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
-;;Note: there is no need to follow symbolic links here, as they will
-;;be substituted for as well.
 (define (substitute-into-environment environment old new)
-  (map (lambda (mapping)
-	 ((car mapping) . (substitute-into-type (cadr mapping) old new)))
+  (map (lambda (mapping) (list (car mapping) (substitute-into-type (cadr mapping) old new)))
        environment))
 
 (define (substitute-into-type type old new)
