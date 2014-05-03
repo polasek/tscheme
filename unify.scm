@@ -1,5 +1,16 @@
 (load "constraints")
 
+(define (substitute-constraints old new constraints)
+  (map (lambda (c)
+         (cond ((equal? (constraint:left c) old)
+                (constraint:make
+                  new (constraint:relation c) (constraint:right c)))
+               ((equal? (constraint:right c) old)
+                (constraint:make
+                  (constraint:left c) (constraint:relation c) new))
+               (else c)))
+       constraints))
+
 (define (substitute old new constraints env)
   (let lp ((constraints constraints))
     (if (null? constraints) '()
