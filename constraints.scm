@@ -1,31 +1,55 @@
 ;;;; Core definitions of types and functions for working with constraints.
 
-;;; Data structure definitions
-
-;; Primitive type
-(define-record-type type
-    (type:make name)
-    type?
-    (name  type:name))
-
-;; Singleton type
-(define-record-type singleton
-    (singleton:make val)
-    singleton?
-    (val  singleton:val))
-
-;; Type variable
-(define-record-type type-variable
-    (var:make name)
-    type-variable?
-    (name  var:name))
-
 (define-record-type constraint
     (constraint:make left relation right)
     constraint?
     (left      constraint:left)
     (relation  constraint:relation)
     (right     constraint:right))
+
+(define-record-type type
+  (type:make boolean number char string symbol pair procedure)
+  type?
+  (boolean type:boolean)
+  (number  type:number)
+  (char    type:char)
+  (string   type:string)
+  (symbol     type:symbol)
+  (pair       type:pair)
+  (procedure  type:procedure))
+
+(define *none* 'none)
+(define *all*  'all)
+
+(define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
+(define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
+(define type:boolean (type:make *all* *none* *none* *none* *none* *none* *none*))
+
+;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
+;;appropriate fields of the type record
+(define (type:finite-set . elts) (raise "TODO type:finite-set"))
+
+;;Takes two finite sets of the same type
+(define (intersect-finite-sets setA setB) (raise "TODO intersect-finite-sets"))
+(define (union-finite-sets setA setB) (raise "TODO union-finite-sets"))
+
+(define (intersect typeA typeB) (raise "TODO intersect"))
+(define (union typeA typeB) (raise "TODO union"))
+
+(define empty-environment '())
+(define (lookup-variable environment var) (assv var environment))
+(define (update-variable environment var type)
+  (cons (var . type) (del-assv var environment)))
+(define (substitute-into-environment environment old new)
+  (map (lambda (mapping) ((car mapping) . (substitute-into-type (cadr mapping) old new)))
+       environment))
+
+;;(tscheme:make-proc-type ret-tv arg-tvs)))
+(define (type:procedure ret-tv arg-tvs)
+  (type:make *none* *none* *none* *none* *none* *none* (cons ret-tv arg-tvs)))
+(define type:any-procedure
+  (type:make *none* *none* *none* *none* *none* *none* *all*))
+
 
 (define *equals*   'EQUALS)
 (define *requires* 'REQUIRES)
@@ -43,31 +67,16 @@
   (and (constraint? constraint)
        (eqv? (constraint:relation constraint) *permits*)))
 
-(define *boolean*   (type:make 'boolean))
-(define *number*    (type:make 'number))
-(define *char*      (type:make 'char))
-(define *string*    (type:make 'string))
-(define *symbol*    (type:make 'symbol))
-(define *pair*      (type:make 'pair))
-(define *procedure* (type:make 'procedure))
-
-(define (type:boolean?   t) (and (type? t) (equal? t *boolean*)))
-(define (type:number?    t) (and (type? t) (equal? t *number*)))
-(define (type:char?      t) (and (type? t) (equal? t *char*)))
-(define (type:string?    t) (and (type? t) (equal? t *string*)))
-(define (type:pair?      t) (and (type? t) (equal? t *pair*)))
-(define (type:procedure? t) (and (type? t) (equal? t *procedure*)))
-
 ;;; Methods to construct instances
 
 ;; Fresh type variables
 (define **type-var-counter** 0)
 (define (fresh #!optional prefix)
   (set! **type-var-counter** (+ **type-var-counter** 1))
-  (var:make (symbol-append (if (equal? prefix #!default)
-                             'x
-                             prefix)
-                           **type-var-counter**)))
+  (symbol-append (if (equal? prefix #!default)
+		     'x
+		     prefix)
+		 **type-var-counter**))
 
 (define (fresh-argvar) (fresh 'argvar))
 (define (fresh-retvar) (fresh 'retvar))
