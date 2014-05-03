@@ -20,13 +20,6 @@
 
 (define *none* 'none)
 (define *all*  'all)
-(define *boolean* 'boolean)
-(define *number* 'number)
-(define *char* 'char)
-(define *string* 'string)
-(define *symbol* 'symbol)
-(define *pair* 'pair)
-(define *procedure* 'procedure)
 
 (define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
@@ -46,6 +39,31 @@
 ;;of typeB as the third argument to f
 ;;I didn't find an easy way to convert to lists and back, therefore the map
 ;;is done manually
+
+;;Dangerous and order-dependent
+(define type:accessors (list type:number type:char type:string type:symbol type:pair type:procedure))
+;;A generic map over types
+(define (type:map f . types)
+  (apply type:make (map (lambda (acc) (apply f (map acc types))) type:accessors)))
+;;A generic map over types that passes the accessor as the first argument
+(define (type:tagged-map f . types)
+  (apply type:make (map (lambda (acc) (apply f (cons acc (map acc types)))) type:accessors)))
+
+(define (type-map2 f typeA typeB)
+  (type:tagged-map f `(,typeA ,typeB)))
+
+  (type:make (apply f (cons *boolean* (map type:boolean types)))
+
+
+  typeA) (type:boolean   typeB))
+	     (f *number*    (type:number    typeA) (type:number    typeB))
+	     (f *char*      (type:char      typeA) (type:char      typeB))
+	     (f *string*    (type:string    typeA) (type:string    typeB))
+	     (f *symbol*    (type:symbol    typeA) (type:symbol    typeB))
+	     (f *pair*      (type:pair      typeA) (type:pair      typeB))
+	     (f *procedure* (type:procedure typeA) (type:procedure typeB))))
+
+
 (define (type-map2 f typeA typeB)
   (type:make (f *boolean*   (type:boolean   typeA) (type:boolean   typeB))
 	     (f *number*    (type:number    typeA) (type:number    typeB))
@@ -64,6 +82,8 @@
 ;; (symbol (symbol all none))
 ;; (pair (pair all none))
 ;; (procedure (procedure all none))
+
+(map type:boolean (list type:top type:make-boolean))
 |#
 
 (define (intersect-type type-tag typeA typeB)
@@ -97,6 +117,8 @@
        environment)
 
 (define (substitute-into-type env old new)
+  (type-map2 (lambda (tag 
+
   (raise "TODO substitute-into-type"))
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
