@@ -42,6 +42,7 @@
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
 ;;appropriate fields of the type record
+#|
 (define (type:finite-set . elts)
   (define (sort-to-bins e bins)
     (cond ((boolean? e) (vector-set! bins 0 (cons e (vector-ref bins 0))))
@@ -65,6 +66,26 @@
                (vector-ref bins 4)
                (vector-ref bins 5)
                *none*)))
+|#
+;;I don't think we ever want pairs or procedures to be parts of finite-list
+(define type:predicates
+  (list boolean? number? char? string? symbol? (lambda (x) #f) (lambda (x) #f)))
+(define (type:finite-set . elts) 
+  (if (not (null? (fold-right ;;Check that elements are of the correct types   
+		   (lambda (type-pred lst) (list-transform-negative lst type-pred))		  
+		   elts
+		   type:predicates)))
+      (raise "Provided list contains elements that cannot be part of a finite set")
+      (apply type:make
+	     (map
+	      (lambda (type-pred)
+		(make-finite-set%
+		 (general-sort
+		  (delete-duplicates (list-transform-positive elts type-pred)))))
+	      type:predicates))))
+#|
+(pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
+|#
 
 ;;Takes two finite sets of the same type
 (define (intersect-finite-sets setA setB)
@@ -134,7 +155,7 @@
   (map (lambda (mapping) ((car mapping) . (substitute-into-type (cadr mapping) old new)))
        environment))
 
-(define (substitute-into-type env old new)
+(define (substitute-into-type type old new)
   (raise "TODO substitute-into-type"))
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
