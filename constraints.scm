@@ -76,7 +76,7 @@
 		   elts
 		   type:predicates)))
       (raise "Provided list contains elements that cannot be part of a finite set")
-      (apply type:make
+      (apply type:make ;;The method itself
 	     (map
 	      (lambda (type-pred)
 		(make-finite-set%
@@ -152,11 +152,20 @@
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
 (define (substitute-into-environment environment old new)
-  (map (lambda (mapping) ((car mapping) . (substitute-into-type (cadr mapping) old new)))
+  (map (lambda (mapping)
+	 ((car mapping) . (substitute-into-type (cadr mapping) old new)))
        environment))
 
 (define (substitute-into-type type old new)
-  (raise "TODO substitute-into-type"))
+  (type:tagged-map (lambda (tag t)
+		     ;;Type variables can only appear in the procedure field
+		     (if (and (eq? tag type:procedure) (list? t))
+			 (map (lambda (tvar) (if (eqv? tvar old)
+						 new
+						 tvar))
+			      t)
+			 t))
+		   type))
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
 ;;A naming conflict!
@@ -208,4 +217,3 @@
 
 (define (constraint:make-permit left right)
   (constraint:make left *permits* right))
-
