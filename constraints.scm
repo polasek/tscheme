@@ -75,15 +75,20 @@
   (make-finite-set%
         (general-sort (remove-duplicates (append (cdr setA) (cdr setB))))))
 
-;;Dangerous and order-dependent, but compact and nice
+;;A generic map over any record type
+;;Dangerous and order-dependent, but compact
+(define (record-map ordered-accessors)
+  (lambda (f . types)
+    (apply type:make (map (lambda (acc) (apply f (map acc types))) ordered-accessors))))
+(define (record-tagged-map ordered-accessors)
+  (lambda (f . types)
+    (apply type:make (map (lambda (acc) (apply f (cons acc (map acc types)))) ordered-accessors))))
+
 (define type:accessors
   (list type:boolean type:number type:char type:string type:symbol type:pair type:procedure))
-;;A generic map over types
-(define (type:map f . types)
-  (apply type:make (map (lambda (acc) (apply f (map acc types))) type:accessors)))
-;;A generic map over types that passes the accessor as the first argument
-(define (type:tagged-map f . types)
-  (apply type:make (map (lambda (acc) (apply f (cons acc (map acc types)))) type:accessors)))
+
+(define type:map (record-map type:accessors))
+(define type:tagged-map (record-tagged-map type:accessors))
 
 #|
 (pp (type:tagged-map list type:top type:make-boolean))
