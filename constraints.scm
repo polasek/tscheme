@@ -132,7 +132,7 @@
   (cons (list var type) (del-assv var environment)))
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping) ((car mapping) . (substitute-into-type (cadr mapping) old new)))
-       environment)
+       environment))
 
 (define (substitute-into-type env old new)
   (raise "TODO substitute-into-type"))
