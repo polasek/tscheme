@@ -33,7 +33,6 @@
 
 (define type:empty (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top   (type:make *all* *all* *all* *all* *all* *all* *all*))
-;;TODO renamed to type:make-* as it was conflicting with getters
 (define type:make-boolean (type:make *all* *none* *none* *none* *none* *none* *none*))
 (define type:make-number  (type:make *none* *all* *none* *none* *none* *none* *none*))
 (define type:make-char    (type:make *none* *all* *none* *none* *none* *none* *none*))
@@ -76,14 +75,9 @@
   (make-finite-set%
         (general-sort (remove-duplicates (append (cdr setA) (cdr setB))))))
 
-;;Applies function f over typeA typeB, passing the type tag as a first argument,
-;;the corresponding element of typeA as second, and the corresponding element
-;;of typeB as the third argument to f
-;;I didn't find an easy way to convert to lists and back, therefore the map
-;;is done manually
-
-;;Dangerous and order-dependent
-(define type:accessors (list type:number type:char type:string type:symbol type:pair type:procedure))
+;;Dangerous and order-dependent, but compact and nice
+(define type:accessors
+  (list type:boolean type:number type:char type:string type:symbol type:pair type:procedure))
 ;;A generic map over types
 (define (type:map f . types)
   (apply type:make (map (lambda (acc) (apply f (map acc types))) type:accessors)))
@@ -91,31 +85,8 @@
 (define (type:tagged-map f . types)
   (apply type:make (map (lambda (acc) (apply f (cons acc (map acc types)))) type:accessors)))
 
-(define (type-map2 f typeA typeB)
-  (type:tagged-map f `(,typeA ,typeB)))
-
-  (type:make (apply f (cons *boolean* (map type:boolean types)))
-
-
-  typeA) (type:boolean   typeB))
-	     (f *number*    (type:number    typeA) (type:number    typeB))
-	     (f *char*      (type:char      typeA) (type:char      typeB))
-	     (f *string*    (type:string    typeA) (type:string    typeB))
-	     (f *symbol*    (type:symbol    typeA) (type:symbol    typeB))
-	     (f *pair*      (type:pair      typeA) (type:pair      typeB))
-	     (f *procedure* (type:procedure typeA) (type:procedure typeB))))
-
-
-(define (type-map2 f typeA typeB)
-  (type:make (f *boolean*   (type:boolean   typeA) (type:boolean   typeB))
-	     (f *number*    (type:number    typeA) (type:number    typeB))
-	     (f *char*      (type:char      typeA) (type:char      typeB))
-	     (f *string*    (type:string    typeA) (type:string    typeB))
-	     (f *symbol*    (type:symbol    typeA) (type:symbol    typeB))
-	     (f *pair*      (type:pair      typeA) (type:pair      typeB))
-	     (f *procedure* (type:procedure typeA) (type:procedure typeB))))
 #|
-(pp (type-map2 list type:top type:make-boolean))
+(pp (type:tagged-map list type:top type:make-boolean))
 ;; #[type 21]
 ;; (boolean (boolean all all))
 ;; (number (number all none))
@@ -128,22 +99,11 @@
 (map type:boolean (list type:top type:make-boolean))
 |#
 
-;;; Slightly cleaner
-(define (type-map f . types)
-  (type:make
-    (apply f (map type:boolean types))
-    (apply f (map type:number  types))
-    (apply f (map type:char    types))
-    (apply f (map type:string  types))
-    (apply f (map type:symbol  types))
-    (apply f (map type:pair    types))
-    (apply f (map type:procedure types))))
-
 (define (intersect-type type-tag typeA typeB)
   (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
 	((eqv? typeA *all*) typeB)
 	((eqv? typeB *all*) typeA)
-	((eq? type-tag *procedure*)
+	((eq? type-tag type:procedure)
 	 (raise "TODO intersect procedure types"))
 	(else (intersect-finite-sets typeA typeB))))
 
@@ -151,15 +111,15 @@
   (cond ((or (eqv? typeA *all*) (eqv? typeB *all*)) *all*)
 	((eqv? typeA *none*) typeB)
 	((eqv? typeB *none*) typeA)
-	((eq? type-tag *procedure*)
+	((eq? type-tag type:procedure)
 	 (raise "TODO union procedure types"))
 	(else (union-finite-sets typeA typeB))))
 
 ;;Computes the intersection of two types
 (define (intersect typeA typeB)
-  (type-map2 intersect-type typeA typeB))
+  (type:tagged-map intersect-type typeA typeB))
 (define (union typeA typeB)
-  (type-map2 union-type typeA typeB))
+  (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
 (define (lookup-variable environment var) (assv var environment))
@@ -170,8 +130,6 @@
        environment)
 
 (define (substitute-into-type env old new)
-  (type-map2 (lambda (tag 
-
   (raise "TODO substitute-into-type"))
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
