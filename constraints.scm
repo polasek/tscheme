@@ -83,8 +83,7 @@
 		   type:predicates)))
       (error "Provided list contains elements that cannot be part of a finite set")
       (apply type:make ;;The method itself; for each type, filter out
-	     (map      ;;the corresponging elements, sort and deduplicate them.
-	      (lambda (type-pred)
+	     (map      ;;the corresponging elements, sort and deduplicate them.  (lambda (type-pred)
 		(make-finite-set%
 		 (dedup (general-sort (list-transform-positive elts type-pred)))))
 	      type:predicates))))
@@ -207,6 +206,24 @@
 			      t)
 			 t))
 		   type))
+
+(define (substitute-constraints old new constraints)
+  (map (lambda (c)
+         (cond ((equal? (constraint:left c) old)
+                (constraint:make
+                  new (constraint:relation c) (constraint:right c)))
+               ((equal? (constraint:right c) old)
+                (constraint:make
+                  (constraint:left c) (constraint:relation c) new))
+               (else c)))
+       constraints))
+
+#|
+(pp 
+ (cadr
+  (substitute-constraints 'a 'b `(,(constraint:make 'a 'equals 'b) ,(constraint:make 'b 'equals 'a)))))
+
+|#
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
 ;;A naming conflict!
