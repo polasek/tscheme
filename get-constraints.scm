@@ -1,5 +1,3 @@
-(load "ghelper")
-(load "constraints")
 
 ;;; Temporary stuff, just so I can get print-outs
 (define (singleton:make x)
@@ -259,13 +257,6 @@
           (lp (+ i 1)
               (cdr remaining-args)
               arg-value-cvmap))))))
-              
-
-(define (return-type tv)
-  (list 'ret tv))
-
-(define (arg-of tv num)
-  (list 'arg tv num))
 
 (define (display-constraint constraint)
   (display "CONSTRAINT(")
