@@ -362,3 +362,36 @@
                                 (constraint:make 'a *equals* 'b))))
 (pp (constraint:make 'a *equals* 'b))
 |#
+
+;;Enforce constraints until fixed point is reached,
+;;Assumes length and ordering of constraints does not change.
+(define (enforce-all-constraints constraints environment)
+  (let ((n (length constraints)))
+    (let until-fixation ((constraints constraints)
+                         (environment environment)
+                         (old (cons '() '())))
+      ;;Exit condition
+      (if (equal? (cons constraints environment) old) old
+        (let lp ((k 0)
+                 (current-constraints constraints)
+                 (current-environment environment))
+          (pp current-constraints)
+          (let* ((res (enforce-constraint current-constraints
+                                          current-environment
+                                          (list-ref current-constraints k)))
+                 (new-environment (car res))
+                 (new-constraints (cadr res)))
+            (if (>= k (- n 1))
+                ;;Test for fixation after enforcing all constraints
+                (until-fixation new-constraints new-environment
+                                (cons constraints environment))
+                (lp (+ k 1) new-constraints new-environment))))))))
+
+#|
+(pp (map record->list
+         (cadr (enforce-all-constraints
+                 `(,(constraint:make 'b *equals* type:make-boolean)
+                   ,(constraint:make 'a *equals* 'b))
+                 '()))))
+|#
+
