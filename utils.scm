@@ -1,5 +1,23 @@
 (declare (usual-integrations))
 
+;; Super specific to our use case, but it's just for debugging
+(define (record->list record)
+  (cond ((constraint? record)
+         (list 'constraint
+           (list 'l: (constraint:left (record->list record)))
+           (constraint:relation record)
+           (list 'r: (constraint:right (record->list record))))
+         (type? record)
+         (list 'type
+           (list 'boolean    (type:boolean record))
+           (list 'number     (type:number record))
+           (list 'char       (type:char record))
+           (list 'string     (type:string record))
+           (list 'symbol     (type:symbol record))
+           (list 'pair       (type:pair record))
+           (list 'procedure  (type:procedure record)))
+         (else record))))
+
 ;; TODO: Make generic
 (define (general-sort lst)
   (define (boolean<? a b) (not (and a b)))
