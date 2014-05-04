@@ -136,9 +136,10 @@
     (error "Provided list contains elements that cannot be part of a finite set")
     (apply type:make ;The method itself; for each type, filter out the
            (map      ;corresponging elements, sort and deduplicate them.
-             (make-finite-set%
+            (lambda (type-pred)              
+              (make-finite-set%
                (dedup (general-sort (list-transform-positive elts type-pred)))))
-           type:predicates)))
+            type:predicates))))
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
 ;; #[type 65]

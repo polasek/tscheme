@@ -1,10 +1,10 @@
 
 ;;; Temporary stuff, just so I can get print-outs
 (define (singleton:make x)
-  (list 'singleton x))
-(define *procedure* 'procedure)
+  (type:finite-set x))
+(define *procedure* type:make-any-procedure)
 (define (tscheme:make-proc-type ret-tv arg-tvs)
-  (cons 'procedure: (cons ret-tv arg-tvs)))
+  (type:make-procedure ret-tv arg-tvs))
 
 ;;; Setup
 

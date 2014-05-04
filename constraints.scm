@@ -131,7 +131,7 @@
 ;;I factored the code out so that it handles all types of constraints, although
 ;;it is probably just more confusing and complicated now.
 (define (enforce-constraint constraints environment constraint)
-  (let* ((left  (constraint:left     constraint))
+  (let* ((left  (lookup-proc-variable environment (constraint:left     constraint)))
          (right (constraint:right    constraint))
          (ctype (constraint:relation constraint))
          (proc (lookup-proc-variable environment left)))
@@ -201,14 +201,17 @@
   (let ((n (length constraints)))
     (let until-fixation ((constraints constraints)
                          (environment base-environment)
-                         (old (cons '() '())))
+                         (old (cons '() '()))
+                         (iter 0))
       ;;Exit condition
-      (if (record-equal? (cons constraints environment) old) old
+;      (if (record-equal? (cons constraints environment) old) old ;;TODO fix this
+      (if (= iter 1000)
+          old
         (let lp ((k 0)
                  (current-constraints constraints)
                  (current-environment environment))
-          (pp current-constraints)
-          (pp (map (lambda (pair) (list (car pair) (record->list (cadr pair)))) current-environment))
+;;          (pp current-constraints)
+;;          (pp (map (lambda (pair) (list (car pair) (record->list (cadr pair)))) current-environment))
           (let* ((res (enforce-constraint current-constraints
                                           current-environment
                                           (list-ref current-constraints k)))
@@ -217,7 +220,8 @@
             (if (>= k (- n 1))
                 ;;Test for fixation after enforcing all constraints
                 (until-fixation new-constraints new-environment
-                                (cons constraints environment))
+                                (cons constraints environment)
+                                (+ 1 iter))
                 (lp (+ k 1) new-constraints new-environment))))))))
 
 #|
@@ -225,6 +229,16 @@
          (cadr (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
                    ,(constraint:make 'a *equals* 'b))))))
+
+(pp (map record->list
+         (cadr (enforce-all-constraints
+                (get-constraints-for test1)))))
+(get-constraints-for test1)
+
+                 `(,(constraint:make 'b *equals* type:make-boolean)
+                   ,(constraint:make 'a *equals* 'b))))))
+
+
 
 (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
