@@ -70,9 +70,18 @@
   (cons (list var type) (del-assv var environment)))
 
 (define (lookup-proc-variable env v)
-  (if (or (tv-ret? v) (tv-arg? v))
-      (type:procedure (lookup-variable env (tv-proc-name v)))
-      #f))
+  (cond ((symbol? v) v)
+        ((or (tv-ret? v) (tv-arg? v))
+         (let ((proc-list) (type:procedure (lookup-variable env (tv-proc-name v)))
+               (k (if (tv-ret? v)
+                      0
+                      (+ 1 (tv-arg-num v)))))
+           (cond ((eq? proc-list *all*) #f)
+                 ((eq? proc-list *none*) (report-failure "Type error detected"))
+                 ((and (list? proc-list) (< k (length proc-list)))
+                  (lookup-proc-variable env (list-ref proc-list k)))
+                 (else (report-failure "Type error detected")))))
+        (else (report-failure "Code error"))))
 
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping)
