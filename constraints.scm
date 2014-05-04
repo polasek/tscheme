@@ -192,8 +192,8 @@
                    type))
 
 ;;More abstraction for dealing with ret and arg references
-(define (tv-ret? v) (eqv? (car v) 'ret))
-(define (tv-arg? v) (eqv? (car v) 'arg))
+(define (tv-ret? v) (and (pair? v) (eqv? (car v) 'ret)))
+(define (tv-arg? v) (and (pair? v) (eqv? (car v) 'arg)))
 (define (tv-proc-name v) (cadr v))
 (define (tv-arg-num v) (caddr v))
 
@@ -208,7 +208,7 @@
 (define (substitute-constraints old new constraints)
   (map (lambda (c)
          (let* ((left (constraint:left c))
-                (ctype (constraint:relationc c))
+                (ctype (constraint:relation c))
                 (right (constraint:right c)))
            (cond ((equal? left old)
                   (constraint:make new ctype right))
@@ -229,6 +229,11 @@
 (pp (cadr (substitute-constraints
             'a 'b `(,(constraint:make 'a 'equals 'b)
                     ,(constraint:make 'b 'equals 'a)))))
+;;#[constraint 11]
+;;(left b)
+;;(relation equals)
+;;(right b)
+;;;Unspecified return value
 |#
 
 ;;(tscheme:make-proc-type ret-tv arg-tvs)))
