@@ -58,7 +58,7 @@
 (define empty-environment '())
 (define (lookup-variable environment var)
   (let ((res (assv var environment)))
-    (if (eq? res #f) type:top res)))
+    (if (eq? res #f) type:top (cadr res))))
 
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
@@ -180,9 +180,6 @@
                  '()
                  (constraint:make 'a *equals* 'b)))))
 
-(pp (caaddr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
-                                '()
-                                (constraint:make 'a *equals* 'b))))
 (pp (constraint:make 'a *equals* 'b))
 |#
 
@@ -216,5 +213,14 @@
                  `(,(constraint:make 'b *equals* type:make-boolean)
                    ,(constraint:make 'a *equals* 'b))
                  '()))))
+
+(enforce-all-constraints
+                 `(,(constraint:make 'b *equals* type:make-boolean)
+                   ,(constraint:make 'a *equals* 'b))
+                 '())
+
+(enforce-constraint '()
+                    `((b ,type:make-boolean))
+                    (constraint:make 'a *equals* 'b))
 |#
 
