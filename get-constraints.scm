@@ -9,6 +9,7 @@
   (cons 'procedure: (cons ret-tv arg-tvs)))
 
 ;;; Setup
+
 (define *the-constraints* '())
 
 (define *base-cvmap*
@@ -16,6 +17,7 @@
     (string-append string-append)
     (- minus)))
 
+;;; This is what we'll use to process pieces of code
 (define (get-constraints-for expr)
   (fluid-let ((*the-constraints* '())
               (**type-var-counter** 0))
@@ -25,12 +27,19 @@
 (define (add-constraint constraint)
   (set! *the-constraints* (cons constraint *the-constraints*)))
 
+;;; Often we will want to pass around two pieces of information: a type
+;;; variable, and a mapping of code variables to type variables.  Typically, tv
+;;; will be the type variable representing the piece of code we have just
+;;; processed, and cvmap will contain the mapping of code variables to type
+;;; variables in the current scope.
 (define-record-type tv&cvmap
     (tv&cvmap:make tv cvmap)
     tv&cvmap?
     (tv     tv&cvmap:tv     tv&cvmap:set-tv!)
     (cvmap  tv&cvmap:cvmap  tv&cvmap:set-cvmap!))
 
+;;; Abstractions for the data structure mapping code variables to type
+;;; variables
 (define (cvmap:make)
   *base-cvmap*)
 
@@ -46,19 +55,7 @@
        (pp key)
        #f))))
 
-
-
-;;; Maybe lambdas should be rewritten with their internal names attached, e.g.
-;;; (lambda_name1 (arg1 arg2) (begin body))
-;(define (lambda? expr)
-;  (and (list? expr)
-;       (symbol? (car expr))
-;       (let ((first (symbol->string (car expr))))
-;        (and (>= (string-length first) 7)
-;             (equal? (string-head first 7) "lambda_")))))
-;
-;(define (lambda-expr-name expr)
-;  (string->symbol (string-tail (symbol->string (car expr)) 7)))
+;;; Helpers for dispatching on the type of code fragment we see
 
 (define (tagged-list? expr tag)
   (and (list? expr)
@@ -73,7 +70,7 @@
   (cadr expr))
 
 (define (lambda-body expr)
-  ;; We assume the body of lambdas is already wrapped in a begin
+  ;; We assume the body of a lambda is already wrapped in a begin
   (caddr expr))
 
 (define (quote? expr)
@@ -85,6 +82,7 @@
 (define (begin? expr)
   (tagged-list? expr 'begin))
 
+;; Returns the sequence of expressions in a begin
 (define (begin-seq expr)
   (cdr expr))
 
@@ -109,11 +107,17 @@
 (define (application-arglist expr)
   (cdr expr))
 
+;;; The workhorse for constraint generation is the following generic operation,
+;;; which takes in an expression and a cvmap (the current mapping of code
+;;; variables to type variables), and produces a tv&cvmap (where the tv is the
+;;; type variable representing the value produced, and the cvmap is an update
+;;; of the old cvmap which accounts for the updates made by our code snippet).
 (define tscheme:process-expr
   (make-generic-operator 2
                          'tscheme:process-expr
                          (lambda (expr cvmap)
                            (tscheme:process-application expr cvmap))))
+
 
 (define (tscheme:process-self-quoting expr cvmap)
   (let ((tv (fresh)))
@@ -122,21 +126,26 @@
    (tv&cvmap:make tv cvmap)))
 
 #|
-(define x (tscheme:process-self-quoting 3 '()))
-
+(define x (tscheme:process-self-quoting 3 (cvmap:make)))
 |#
 
 (defhandler tscheme:process-expr tscheme:process-self-quoting number?)
 (defhandler tscheme:process-expr tscheme:process-self-quoting string?)
 
+;;; Handler for lambda expressions
 (define (tscheme:process-lambda expr cvmap)
-  (let ((lambda-tv (fresh-procvar))
-        (ret-tv (fresh-retvar))
-        (arg-tvs '())
-        (outer-cvmap cvmap)    ; outer-cvmap will not be mutated
-        (inner-cvmap cvmap))   ; inner-cvmap will get mutated (the pointer, not
-                               ; the object itself)
-    ;; Crappy way to do this, but I can't think of a better one right now
+  (let ((lambda-tv (fresh-procvar)) ; points to the procedure object created by
+                                    ; the lambda
+        (ret-tv (fresh-retvar))   ; the return type of the procedure
+        (arg-tvs '())             ; the argument types of the procedure
+        (outer-cvmap cvmap)    ; cvmap of the scope outside the lambda, will
+                               ; not be mutated
+        (inner-cvmap cvmap))   ; cvmap of the scope inside the lambda, will be
+                               ; mutated to incorporate the formal parameters
+                               ; of the lambda, as well as any internal
+                               ; definitions (the pointer to inner-cvmap, not
+                               ; the object itself, is mutated).
+    ;; Build up arg-tvs and bind the formal parameters in inner-cvmap
     (let lp ((remaining-args (lambda-arglist expr)))
      (if (null? remaining-args)
        #!unspecific
@@ -147,18 +156,21 @@
          (set! inner-cvmap (cvmap:bind inner-cvmap arg-cv arg-tv))
          (lp (cdr remaining-args)))))
 
-     (add-constraint
-       (constraint:make-equal lambda-tv
-                              (tscheme:make-proc-type ret-tv arg-tvs)))
+    ;; Let the unifier know what the argument and return variables of this
+    ;; procedure are
+    (add-constraint
+      (constraint:make-equal lambda-tv
+                             (tscheme:make-proc-type ret-tv arg-tvs)))
 
-    ;; Recurse into the body, and say what we can about the return type
+    ;; Recurse into the body, and say what we can about the return type of the
+    ;; last expression (again, we assume that the body is wrapped in a begin)
     (add-constraint
       (constraint:make-require
         ret-tv
         (tv&cvmap:tv (tscheme:process-expr (lambda-body expr) inner-cvmap))))
 
-    ;; We use the outer cvmap because the bindings within the body of that
-    ;; lambda are not relevant to code outside the body
+    ;; We use the outer cvmap because we are returning to the scope outside the
+    ;; body of our lambda.
     (tv&cvmap:make lambda-tv outer-cvmap)))
   
 (defhandler tscheme:process-expr tscheme:process-lambda lambda?)
@@ -181,6 +193,7 @@
   
 (defhandler tscheme:process-expr tscheme:process-begin begin?)
 
+;;; Handler for defines
 (define (tscheme:process-define expr cvmap)
   (let ((tv&cvmap (tscheme:process-expr (define-rhs expr) cvmap)))
    (tv&cvmap:make
@@ -191,6 +204,7 @@
 
 (defhandler tscheme:process-expr tscheme:process-define define?)
 
+;;; Handler for variables
 (define (tscheme:process-variable expr cvmap)
   (let ((tv (cvmap:lookup expr cvmap)))
    (tv&cvmap:make (if tv
@@ -200,6 +214,8 @@
 
 (defhandler tscheme:process-expr tscheme:process-variable variable?)
 
+;;; Handler for applications.
+;;;
 ;;; Plan:
 ;;; Operator permits procedure.
 ;;; Allocate fresh variable r for the return of this application.
@@ -213,23 +229,28 @@
            (tscheme:process-expr (application-operator expr) cvmap))
          (operator-tv (tv&cvmap:tv operator-tv&cvmap))
          (return-tv (fresh)))
+    ;; Operator must be a procedure
     (add-constraint
       (constraint:make-permit operator-tv *procedure*))
+    ;; The value produced will always be an element of the return type of
+    ;; operator
     (add-constraint
       (constraint:make-require return-tv (return-type operator-tv)))
     ;; The order in which we evaluate the arguments is unspecified, but we do
-    ;; need to keep track of the cvmap throughout this process
+    ;; need to keep track of updates to the cvmap throughout this process.
     (let lp ((i 0)
              (remaining-args (application-arglist expr))
              (next-cvmap (tv&cvmap:cvmap operator-tv&cvmap)))
       (if (null? remaining-args)
         (tv&cvmap:make return-tv next-cvmap)
         (let* ((arg-value-expr (car remaining-args))
-               (arg-value-tv&cvmap (tscheme:process-expr arg-value-expr cvmap))
+               (arg-value-tv&cvmap (tscheme:process-expr arg-value-expr next-cvmap))
                (arg-value-tv (tv&cvmap:tv arg-value-tv&cvmap))
                (arg-value-cvmap (tv&cvmap:cvmap arg-value-tv&cvmap))
                (arg-tv (arg-of operator-tv i)))
           (add-constraint
+            ;; For variables passed as arguments, we use require; for
+            ;; everything else, we use permit
             (if (variable? arg-value-expr)
               (constraint:make-require arg-value-tv
                                        arg-tv)
@@ -339,4 +360,17 @@
 
 (print-recursive (get-constraints-for test5))
 
+;;; Assignments within arguments
+(define test6
+  '(begin
+     (+ (begin
+          (define x 3)
+          1)
+        2)
+     x))
+
+(print-recursive (get-constraints-for test6))
+
 |#
+
+
