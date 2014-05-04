@@ -306,10 +306,8 @@
 
 #|
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
-(pp (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
-			'() (constraint:make 'a *equals* 'b)))
-(vector->list type:make-boolean)
-(display `(,type:make-boolean))
+(pp (map record->list (cadr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
+                                                '() (constraint:make 'a *equals* 'b)))))
 
 (pp (caaddr (enforce-constraint `(,(constraint:make 'b *equals* type:make-boolean))
 			       '() (constraint:make 'a *equals* 'b))))

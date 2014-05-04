@@ -4,9 +4,9 @@
 (define (record->list record)
   (cond ((constraint? record)
          (list 'constraint
-           (list 'l: (constraint:left (record->list record)))
+           (list 'l: (record->list (constraint:left record)))
            (constraint:relation record)
-           (list 'r: (constraint:right (record->list record))))
+           (list 'r: (record->list (constraint:right record))))
          ((type? record)
          (list 'type
            (list 'boolean    (type:boolean record))
