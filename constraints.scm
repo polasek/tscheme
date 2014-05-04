@@ -131,53 +131,47 @@
 ;;I factored the code out so that it handles all types of constraints, although
 ;;it is probably just more confusing and complicated now.
 (define (enforce-constraint constraints environment constraint)
-  (let* ((left  (lookup-proc-variable environment (constraint:left     constraint)))
-         (right (constraint:right    constraint))
-         (ctype (constraint:relation constraint))
-         (proc (lookup-proc-variable environment left)))
-          ;;Two of the same variable, or no info about arg/ret -> do nothing
-    (cond ((or (eqv? left right) (type:all? proc))
-           (list environment constraints))
-          ((type:none? proc)
-           (report-failure "There is no possible type for this arg/ret"))
-          (else
-            (let* ((left (cond ((tv-ret? left) (proc:get-ret proc))
-                               ((tv-arg? left) (proc:get-arg proc (tv-arg-num left)))
-                               (else left)))
-                   (tA (lookup-variable environment left))
-                   (tB (if (symbol? right)
-                           (lookup-variable environment right)
-                           right))
-                   (newType (intersect tA tB))
-                   ;;In the case of permits, simply adding these new
-                   ;;relations is not correct. TODO fix that.
-                   (newConstraints
-                     (if (or (eq? ctype *equals*) (eq? ctype *requires*))
-                       ;;Collect aditional constraints and add them
-                       (append (map
-                                 (lambda (l-and-r)
-                                   (constraint:make
-                                     (car l-and-r) ctype (cadr l-and-r)))
-                                 (collect-proc-types tA tB))
-                               constraints)
-                       constraints)))
-              (if (type:empty? newType)
-                  ;;TODO enforcing that the returned type is not empty.
-                  (report-failure
-                    "There is no possible type for this variable")
-                  ;;Update variable binding if not permits
-                  (list (update-variable
-                          ;;Update environment if equals
-                          (if (and (eq? ctype *equals*) (symbol? right))
-                              (substitute-into-environment
-                                environment left right)
-                              environment)
-                          left
-                          (if (eq? ctype *permits*) tA newType))
-                        ;;Return updated constraints
-                        (if (and (eq? ctype *equals*) (symbol? right))
-                            (substitute-constraints left right newConstraints)
-                            constraints))))))))
+  (let* ((left  (lookup-proc-variable environment (constraint:left constraint)))
+         (right (lookup-proc-variable environment (constraint:right constraint)))
+         (ctype (constraint:relation constraint)))
+        ;;Two of the same variable, or no info about arg/ret -> do nothing
+    (if (or (not left) (not right) (eqv? left right))
+        (list environment constraints)
+        ;; Otherwise left is a type variable, right is a type var or a type
+        (let* ((tA (lookup-variable environment left))
+               (tB (if (symbol? right)
+                       (lookup-variable environment right)
+                       right))
+               (newType (intersect tA tB))
+               ;;In the case of permits, simply adding these new
+               ;;relations is not correct. TODO fix that.
+               (newConstraints
+                 (if (or (eq? ctype *equals*) (eq? ctype *requires*))
+                   ;;Collect aditional constraints and add them
+                   (append (map
+                             (lambda (l-and-r)
+                               (constraint:make
+                                 (car l-and-r) ctype (cadr l-and-r)))
+                             (collect-proc-types tA tB))
+                           constraints)
+                   constraints)))
+          (if (type:empty? newType)
+              ;;TODO enforcing that the returned type is not empty.
+              (report-failure
+                "There is no possible type for this variable")
+              ;;Update variable binding if not permits
+              (list (update-variable
+                      ;;Update environment if equals
+                      (if (and (eq? ctype *equals*) (symbol? right))
+                          (substitute-into-environment
+                            environment left right)
+                          environment)
+                      left
+                      (if (eq? ctype *permits*) tA newType))
+                    ;;Return updated constraints
+                    (if (and (eq? ctype *equals*) (symbol? right))
+                        (substitute-constraints left right newConstraints)
+                        constraints)))))))
 ;;If my understanding of the difference between equals and requires is correct,
 ;;then the difference in the implementation is that if requires is of form
 ;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, the two
