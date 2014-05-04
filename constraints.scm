@@ -48,31 +48,6 @@
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
 ;;appropriate fields of the type record
-#|
-(define (type:finite-set . elts)
-  (define (sort-to-bins e bins)
-    (cond ((boolean? e) (vector-set! bins 0 (cons e (vector-ref bins 0))))
-          ((number?  e) (vector-set! bins 1 (cons e (vector-ref bins 1))))
-          ((char?    e) (vector-set! bins 2 (cons e (vector-ref bins 2))))
-          ((string?  e) (vector-set! bins 3 (cons e (vector-ref bins 3))))
-          ((symbol?  e) (vector-set! bins 4 (cons e (vector-ref bins 4))))
-          ((pair?    e) (vector-set! bins 5 (cons e (vector-ref bins 5)))))
-    bins)
-  (define (sort-within-bin lst)
-    (if (null? lst)
-        *none*
-        (make-finite-set% (dedup (general-sort lst)))))
-  (let ((bins (vector-map
-                (fold-right sort-to-bins '#( () () () () () () ) elts)
-                sort-within-bin)))
-    (type:make (vector-ref bins 0)
-               (vector-ref bins 1)
-               (vector-ref bins 2)
-               (vector-ref bins 3)
-               (vector-ref bins 4)
-               (vector-ref bins 5)
-               *none*)))
-|#
 ;;I don't think we ever want pairs or procedures to be parts of finite-list
 (define type:predicates
   (list boolean? number? char? string? symbol? (lambda (x) #f) (lambda (x) #f)))
@@ -86,7 +61,7 @@
 	     (map      ;;the corresponging elements, sort and deduplicate them.  (lambda (type-pred)
 		(make-finite-set%
 		 (dedup (general-sort (list-transform-positive elts type-pred)))))
-	      type:predicates))))
+	      type:predicates)))
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
 ;; #[type 65]
