@@ -7,7 +7,7 @@
 ;;Takes two finite sets of the same type
 (define (intersect-finite-sets setA setB)
   (make-finite-set%
-    (general-sort (filter (lambda (e) (memv e setB)) setA))))
+    (general-sort (filter (lambda (e) (memv e (cdr setB))) (cdr setA)))))
 
 (define (union-finite-sets setA setB)
   (make-finite-set%
@@ -20,7 +20,7 @@
         ((eqv? typeA *all*) typeB)
         ((eqv? typeB *all*) typeA)
         ((eq? type-tag type:procedure) ;;At this point, we know both are lists
-         (if (!= (length typeA) (length typeB))
+         (if (not (= (length typeA) (length typeB)))
              (report-failure
                "Cannot unify: procedures have different number of arguments")
              typeA)) ;;Simply return the first one. TODO make sure this is correct
@@ -70,7 +70,8 @@
   (cons (list var type) (del-assv var environment)))
 
 (define (lookup-proc-variable env v)
-  (cond ((symbol? v) v)
+  (cond ((type? v) v)
+        ((symbol? v) v)
         ((or (tv-ret? v) (tv-arg? v))
          (let* ((proc-list (type:procedure (lookup-variable env (tv-proc-name v))))
                 (k (if (tv-ret? v)
@@ -81,7 +82,8 @@
                  ((and (list? proc-list) (< k (length proc-list)))
                   (lookup-proc-variable env (list-ref proc-list k)))
                  (else (report-failure "Type error detected")))))
-        (else (report-failure "Code error"))))
+        (else (begin (pp v)
+                     (report-failure "Code error")))))
 
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping)
@@ -228,6 +230,12 @@
                 (lp (+ k 1) new-constraints new-environment))))))))
 
 #|
+(define test1
+  '(lambda (x y)
+     (begin
+       (+ x 5)
+       (string-append y "a b"))))
+
 (pp (map record->list
          (cadr (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
@@ -236,10 +244,11 @@
 (pp (map record->list
          (cadr (enforce-all-constraints
                 (get-constraints-for test1)))))
-(get-constraints-for test1)
 
-                 `(,(constraint:make 'b *equals* type:make-boolean)
-                   ,(constraint:make 'a *equals* 'b))))))
+(enforce-all-constraints
+ (get-constraints-for test1))
+
+(print-recursive (get-constraints-for test1))
 
 
 

@@ -142,6 +142,7 @@
             type:predicates))))
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
+(pp (type:finite-set "a b"))
 ;; #[type 65]
 ;; (boolean (finite-set #f))
 ;; (number (finite-set 1 2 3 9 32))
