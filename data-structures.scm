@@ -16,6 +16,25 @@
   (pair       type:pair)
   (procedure  type:procedure))
 
+(define (record-equal? a b)
+  (cond ((and (pair? a) (pair? b))
+         (and (record-equal? (car a) (car b))
+              (record-equal? (cdr b) (cdr b))))
+        ((and (constraint? a) (constraint? b))
+         (and (record-equal? (constraint:left     a) (constraint:left b))
+              (record-equal? (constraint:relation a) (constraint:relation b))
+              (record-equal? (constraint:right    a) (constraint:right b))))
+        ((and (type? a) (type? b))
+         (and (record-equal? (type:boolean   a) (type:boolean b))
+              (record-equal? (type:number    a) (type:number b))
+              (record-equal? (type:char      a) (type:char b))
+              (record-equal? (type:string    a) (type:string b))
+              (record-equal? (type:symbol    a) (type:symbol b))
+              (record-equal? (type:pair      a) (type:pair b))
+              (record-equal? (type:procedure a) (type:procedure b))))
+        (else (eqv? a b))))
+
+
 ;;A generic map over any record type
 ;;Dangerous and order-dependent, but compact
 (define (record-map ordered-accessors)

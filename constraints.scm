@@ -197,7 +197,7 @@
                          (environment environment)
                          (old (cons '() '())))
       ;;Exit condition
-      (if (equal? (cons constraints environment) old) old
+      (if (record-equal? (cons constraints environment) old) old
         (let lp ((k 0)
                  (current-constraints constraints)
                  (current-environment environment))
