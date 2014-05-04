@@ -56,6 +56,12 @@
   (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
+(define base-environment `((number  ,type:make-number)
+                           (string  ,type:make-string)                           
+                           (plus    ,(type:make-procedure 'number '(number number)))
+                           (minus   ,(type:make-procedure 'number '(number number)))
+                           (string-append ,(type:make-procedure 'string '(string string)))))
+
 (define (lookup-variable environment var)
   (let ((res (assv var environment)))
     (if (eq? res #f) type:top (cadr res))))
@@ -122,7 +128,7 @@
 ;;them.
 ;;Processes one constraint passed as the constraint argument,
 ;;doesn't examine other constraints (only substitutes into them, if appropriate).
-;:I factored the code out so that it handles all types of constraints, although
+;;I factored the code out so that it handles all types of constraints, although
 ;;it is probably just more confusing and complicated now.
 (define (enforce-constraint constraints environment constraint)
   (let* ((left  (constraint:left     constraint))
@@ -191,10 +197,10 @@
 
 ;;Enforce constraints until fixed point is reached,
 ;;Assumes length and ordering of constraints does not change.
-(define (enforce-all-constraints constraints environment)
+(define (enforce-all-constraints constraints)
   (let ((n (length constraints)))
     (let until-fixation ((constraints constraints)
-                         (environment environment)
+                         (environment base-environment)
                          (old (cons '() '())))
       ;;Exit condition
       (if (record-equal? (cons constraints environment) old) old
@@ -202,6 +208,7 @@
                  (current-constraints constraints)
                  (current-environment environment))
           (pp current-constraints)
+          (pp (map (lambda (pair) (list (car pair) (record->list (cadr pair)))) current-environment))
           (let* ((res (enforce-constraint current-constraints
                                           current-environment
                                           (list-ref current-constraints k)))
@@ -217,16 +224,10 @@
 (pp (map record->list
          (cadr (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
-                   ,(constraint:make 'a *equals* 'b))
-                 '()))))
+                   ,(constraint:make 'a *equals* 'b))))))
 
 (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
-                   ,(constraint:make 'a *equals* 'b))
-                 '())
-
-(enforce-constraint '()
-                    `((b ,type:make-boolean))
-                    (constraint:make 'a *equals* 'b))
+                   ,(constraint:make 'a *equals* 'b)))
 |#
 
