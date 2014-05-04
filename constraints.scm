@@ -236,6 +236,22 @@
        (+ x 5)
        (string-append y "a b"))))
 
+(define prestest-success
+  '((lambda (x y)
+      (begin
+        (+ x y)
+        "done"))
+    3
+    4))
+
+(define prestest-fail
+  '((lambda (x y)
+      (begin
+        (+ x y)
+        "done"))
+    3
+    "a"))
+
 (pp (map record->list
          (cadr (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
@@ -243,14 +259,12 @@
 
 (pp (map record->list
          (cadr (enforce-all-constraints
-                (get-constraints-for test1)))))
+                (get-constraints-for prestest)))))
 
-(enforce-all-constraints
- (get-constraints-for test1))
+(ignore (enforce-all-constraints (get-constraints-for prestest-fail)))
+(ignore (enforce-all-constraints (get-constraints-for prestest-success)))
 
 (print-recursive (get-constraints-for test1))
-
-
 
 (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)

@@ -38,6 +38,7 @@
 
 (define (any? x) #t)
 
+(define (ignore a) unspecific)
 
 (define ((compose f g) x) (f (g x)))
 
