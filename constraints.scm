@@ -72,10 +72,10 @@
 (define (lookup-proc-variable env v)
   (cond ((symbol? v) v)
         ((or (tv-ret? v) (tv-arg? v))
-         (let ((proc-list) (type:procedure (lookup-variable env (tv-proc-name v)))
-               (k (if (tv-ret? v)
-                      0
-                      (+ 1 (tv-arg-num v)))))
+         (let* ((proc-list (type:procedure (lookup-variable env (tv-proc-name v))))
+                (k (if (tv-ret? v)
+                       0
+                       (+ 1 (tv-arg-num v)))))
            (cond ((eq? proc-list *all*) #f)
                  ((eq? proc-list *none*) (report-failure "Type error detected"))
                  ((and (list? proc-list) (< k (length proc-list)))
