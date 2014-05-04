@@ -168,9 +168,3 @@
 (define (proc:get-ret proc) (car proc))
 (define (proc:get-arg proc n) (list-ref proc (+ n 1)))
 
-(define (lookup-proc-variable env v)
-  (if (or (tv-ret? v) (tv-arg? v))
-      (type:procedure (lookup-variable env (tv-proc-name v)))
-      #f))
-
-

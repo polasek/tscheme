@@ -62,6 +62,12 @@
 
 (define (update-variable environment var type)
   (cons (list var type) (del-assv var environment)))
+
+(define (lookup-proc-variable env v)
+  (if (or (tv-ret? v) (tv-arg? v))
+      (type:procedure (lookup-variable env (tv-proc-name v)))
+      #f))
+
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping)
          (list (car mapping) (substitute-into-type (cadr mapping) old new)))
