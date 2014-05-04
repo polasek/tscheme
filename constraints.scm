@@ -191,15 +191,38 @@
                          t))
                    type))
 
+;;More abstraction for dealing with ret and arg references
+(define (tv-ret? v) (eqv? (car v) 'ret))
+(define (tv-arg? v) (eqv? (car v) 'arg))
+(define (tv-proc-name v) (cadr v))
+(define (tv-arg-num v) (caddr v))
+
+(define (proc:get-ret proc) (car proc))
+(define (proc:get-arg proc n) (list-ref proc (+ n 1)))
+
+(define (lookup-proc-variable env v)
+  (if (or (tv-ret? v) (tv-arg? v))
+      (type:procedure (lookup-variable env (tv-proc-name v)))
+      #f))
+
 (define (substitute-constraints old new constraints)
   (map (lambda (c)
-         (cond ((equal? (constraint:left c) old)
-                (constraint:make
-                  new (constraint:relation c) (constraint:right c)))
-               ((equal? (constraint:right c) old)
-                (constraint:make
-                  (constraint:left c) (constraint:relation c) new))
-               (else c)))
+         (let* ((left (constraint:left c))
+                (ctype (constraint:relationc c))
+                (right (constraint:right c)))
+           (cond ((equal? left old)
+                  (constraint:make new ctype right))
+                 ((and (tv-ret? left) (equal? (tv-proc-name left) old))
+                  (constraint:make (return-type new) ctype right))
+                 ((and (tv-arg? left) (equal? (tv-proc-name left) old))
+                  (constraint:make (arg-of new (tv-arg-num left)) ctype right))
+                 ((equal? right old)
+                  (constraint:make left ctype new))
+                 ((and (tv-ret? right) (equal? (tv-proc-name right) old))
+                  (constraint:make left ctype (return-type new)))
+                 ((and (tv-arg? right) (equal? (tv-proc-name right) old))
+                  (constraint:make left ctype (arg-of new (tv-arg-num left))))
+                 (else c))))
        constraints))
 
 #|
