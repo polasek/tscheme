@@ -6,8 +6,8 @@
          (list 'constraint
            (list 'l: (record->list (constraint:left record)))
            (constraint:relation record)
-           (list 'r: (record->list (constraint:right record))))
-         ((type? record)
+           (list 'r: (record->list (constraint:right record)))))
+        ((type? record)
          (list 'type
            (list 'boolean    (type:boolean record))
            (list 'number     (type:number record))
@@ -16,7 +16,11 @@
            (list 'symbol     (type:symbol record))
            (list 'pair       (type:pair record))
            (list 'procedure  (type:procedure record))))
-         (else record))))
+        (else record)))
+
+#|
+(pp (record->list (constraint:make-require type:make-string 'b)))
+|#
 
 ;; TODO: Make generic
 (define (general-sort lst)

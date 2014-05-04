@@ -1,14 +1,9 @@
-(load "utils")
-
-;;;; Core definitions of types and functions for working with constraints.
-
 (define-record-type constraint
     (constraint:make left relation right)
     constraint?
     (left      constraint:left)
     (relation  constraint:relation)
     (right     constraint:right))
-
 
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
@@ -20,6 +15,10 @@
   (symbol     type:symbol)
   (pair       type:pair)
   (procedure  type:procedure))
+
+(load "utils")
+
+;;;; Core definitions of types and functions for working with constraints.
 
 (define *none* 'none)
 (define *all*  'all)
