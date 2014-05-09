@@ -83,7 +83,7 @@
                   (lookup-proc-variable env (list-ref proc-list k)))
                  (else (report-failure "Type error detected")))))
         (else (begin (pp v)
-                     (report-failure "Code error")))))
+                     (report-failure "Programmer error. I suck.")))))
 
 (define (substitute-into-environment environment old new)
   (map (lambda (mapping)
@@ -100,25 +100,33 @@
                          t))
                    type))
 
+(define (substitute-constraint old new constraint)
+  (let* ((left (constraint:left constraint))
+	 (ctype (constraint:relation constraint))
+                (right (constraint:right constraint)))
+    (cond ((equal? left old)
+	   (constraint:make new ctype right))
+	  ((and (tv-ret? left) (equal? (tv-proc-name left) old))
+	   (constraint:make (return-type new) ctype right))
+	  ((and (tv-arg? left) (equal? (tv-proc-name left) old))
+	   (constraint:make (arg-of new (tv-arg-num left)) ctype right))
+	  ((equal? right old)
+	   (constraint:make left ctype new))
+	  ((and (tv-ret? right) (equal? (tv-proc-name right) old))
+	   (constraint:make left ctype (return-type new)))
+	  ((and (tv-arg? right) (equal? (tv-proc-name right) old))
+	   (constraint:make left ctype (arg-of new (tv-arg-num left))))
+	  (else constraint))))
+
 (define (substitute-constraints old new constraints)
-  (map (lambda (c)
-         (let* ((left (constraint:left c))
-                (ctype (constraint:relation c))
-                (right (constraint:right c)))
-           (cond ((equal? left old)
-                  (constraint:make new ctype right))
-                 ((and (tv-ret? left) (equal? (tv-proc-name left) old))
-                  (constraint:make (return-type new) ctype right))
-                 ((and (tv-arg? left) (equal? (tv-proc-name left) old))
-                  (constraint:make (arg-of new (tv-arg-num left)) ctype right))
-                 ((equal? right old)
-                  (constraint:make left ctype new))
-                 ((and (tv-ret? right) (equal? (tv-proc-name right) old))
-                  (constraint:make left ctype (return-type new)))
-                 ((and (tv-arg? right) (equal? (tv-proc-name right) old))
-                  (constraint:make left ctype (arg-of new (tv-arg-num left))))
-                 (else c))))
-       constraints))
+  (map (lambda (c) (substitute-constraint old new c)) constraints))
+
+(define (multi-substitute-constraint subs constraint)
+  (if (null? subs)
+      constraint
+      (multi-substitute-constraint
+       (cdr subs)
+       (substitute-constraint (caar subs) (cadar subs) constraint))))
 
 #|
 (pp (cadr (substitute-constraints
@@ -131,6 +139,76 @@
 ;;;Unspecified return value
 |#
 
+;;Compose two substitution maps, so that for example running
+;; (multi-substitute-into-environment
+;;   (multi-substitute-into-environment environment subsA) subsB)
+;; is equivalent to
+;; (multi-substitute-into-environment environment
+;;   (compose-substitutions subsA subsB))
+;; Where
+;; (multi-substitute-into-environment environment (cons '(old new) rest))
+;; is equivalent to
+;; (multi-substitute-into-environment
+;;   (substitute-into-environment environment old new) rest)
+;; Assumes all substitutions were properly composed before.
+
+(define (compose-substitutions subsA subsB)
+  (if (null? subsB)
+      subsA
+      (append
+       (map (lambda (a)
+	      (list (car a)
+		    (fold-left (lambda (v b)
+				 (if (eq? (car b) v) 
+				     ;;If there is something substituting for our
+				     ;;result later, we might as well do it
+				     (cadr b) ;;straight away.
+				     v))
+			       (cadr a)
+			       subsB)))
+	    subsA)  
+       ;;Remove all elements from b that have been already substituted for by a.
+       (list-transform-negative 
+	   subsB
+	 (lambda (b)
+	   (there-exists? subsA (lambda (a) (eq? (car a) (car b)))))))))
+  
+;;Add an element to the end of list
+(define (cons-last a l)
+  (if (null? l)
+      (list a)
+      (cons (car l) (cons-last a (cdr l)))))
+
+(define (add-substitution subs sub)
+  (let ((subs-comp
+	 (map (lambda (s)
+		(list (car a) (if (eq? (car sub) (cadr a))
+				  (cadr sub)
+				  (cadr a))))
+	      subs)))
+    (if (there-exists? subs-comp (lambda (a) (eq? (car a) (car b))))
+	subs-comp
+	(cons-last sub subs-comp))))
+	       
+(define (multi-substitute-into-environment environment subs)
+  (if (null? subs)
+      environment
+      (multi-substitute-into-environment
+       (substitute-into-environment environment (caar subs) (cadar subs))
+       (cdr subs))))
+
+#|
+(compose-substitutions '((a b) (c d) (e f)) '((g h) (i j) (k l)))
+;Value 17: ((a b) (c d) (e f) (g h) (i j) (k l))
+(compose-substitutions '((a b) (c d) (e f)) '((b h) (c j) (f l)))
+;Value 19: ((a h) (c d) (e l) (b h) (f l))
+(compose-substitutions '((a b) (c d) (e f)) '((a h) (c j) (e l)))
+;Value 20: ((a b) (c d) (e f))
+|#
+
+;;Changes: enforce-constraint takes a single constraint and the environment
+;;and returns a list of substitutions.
+
 ;;TODO I am not entirely sure about adding constraints this way. I think it
 ;;should work for requires and equals, it might not work for permits in some
 ;;cases.
@@ -141,13 +219,17 @@
 ;;doesn't examine other constraints (only substitutes into them, if appropriate).
 ;;I factored the code out so that it handles all types of constraints, although
 ;;it is probably just more confusing and complicated now.
-(define (enforce-constraint constraints environment constraint)
-  (let* ((left  (lookup-proc-variable environment (constraint:left constraint)))
+(define (enforce-constraint env-subs constraint_)
+  (let* ((environment (car env-subs))
+	 (prev_subs   (cadr env-subs)) ;;Previously made substitutions on this run
+	 ;; Update the constraint according to our current substitutions
+	 (constraint (multi-substitute-constraint prev_subs constraint_))
+	 (left  (lookup-proc-variable environment (constraint:left constraint)))
          (right (lookup-proc-variable environment (constraint:right constraint)))
          (ctype (constraint:relation constraint)))
-        ;;Two of the same variable, or no info about arg/ret -> do nothing
     (if (or (not left) (not right) (eqv? left right))
-        (list environment constraints)
+	;;Two of the same variable, or no info about arg/ret -> do nothing
+	(list environment prev_subs)
         ;; Otherwise left is a type variable, right is a type var or a type
         (let* ((tA (lookup-variable environment left))
                (tB (if (symbol? right)
@@ -157,37 +239,50 @@
                ;;In the case of permits, simply adding these new
                ;;relations is not correct. TODO fix that.
                (newConstraints
-                 (if (or (eq? ctype *equals*) (eq? ctype *requires*))
-                   ;;Collect aditional constraints and add them
-                   (append (map
-                             (lambda (l-and-r)
-                               (constraint:make
-                                 (car l-and-r) ctype (cadr l-and-r)))
-                             (collect-proc-types tA tB))
-                           constraints)
-                   constraints)))
+		(if (or (not (eq? ctype *permits*))
+			(for-all? type:accessors-proc
+				  (lambda (acc) (eq? (acc newType) *none*))))
+		    ;;We are either not dealing with permits, or the permits
+		    ;;requires a check on procedure arguments.
+		    (map
+		     (lambda (l-and-r)
+		       (constraint:make
+			(car l-and-r) ctype (cadr l-and-r)))
+		     (collect-proc-types tA tB))
+		    '()))
+	       ;;A new substitution
+	       (newSub (if (and (eq? ctype *equals*) (symbol? right))
+			   `((,left ,right))
+			   '()))
+	       ;;Aggregate the new substitution (if any) with exisiting ones
+	       (subs (compose-substitutions prev_subs newSub))
+	       ;;New environment after new substitution and type restriction
+	       (newEnvironment
+		(if (or (eq? ctype *equals*) (eq? ctype *requires*))
+		    (update-variable
+		     (multi-substitute-into-environment environment newSub)
+		     left
+		     newType)		    
+		    environment)))
           (if (type:empty? newType)
               ;;TODO enforcing that the returned type is not empty.
               (report-failure
                 "There is no possible type for this variable")
-              ;;Update variable binding if not permits
-              (list (update-variable
-                      ;;Update environment if equals
-                      (if (and (eq? ctype *equals*) (symbol? right))
-                          (substitute-into-environment
-                            environment left right)
-                          environment)
-                      left
-                      (if (eq? ctype *permits*) tA newType))
-                    ;;Return updated constraints
-                    (if (and (eq? ctype *equals*) (symbol? right))
-                        (substitute-constraints left right newConstraints)
-                        constraints)))))))
+	      ;;Process the newly generated constraitns (they won't be
+	      ;; kept for running to convergence, once processed,
+	      ;; these generated constraints are thrown away).
+	      (fold-left enforce-constraint
+			 (list newEnvironment subs)
+			 newConstraints))))))
 ;;If my understanding of the difference between equals and requires is correct,
 ;;then the difference in the implementation is that if requires is of form
 ;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, the two
 ;;should be the same, I think. Permits then doesn't update any bindings whatsoever,
 ;;only checks that the intersections are non-empty.
+
+;;Gets passed substitutions as an additional argument.
+;;Assumes that subs have been performed on environment but not
+;;on the constraint.
 
 #|
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
@@ -206,29 +301,16 @@
   (let ((n (length constraints)))
     (let until-fixation ((constraints constraints)
                          (environment base-environment)
-                         (old (cons '() '()))
                          (iter 0))
       ;;Exit condition
 ;      (if (record-equal? (cons constraints environment) old) old ;;TODO fix this
       (if (= iter 1000)
-          old
-        (let lp ((k 0)
-                 (current-constraints constraints)
-                 (current-environment environment))
-;;          (pp current-constraints)
-;;          (pp (map (lambda (pair) (list (car pair) (record->list (cadr pair)))) current-environment))
-          (let* ((res (enforce-constraint current-constraints
-                                          current-environment
-                                          (list-ref current-constraints k)))
-                 (new-environment (car res))
-                 (new-constraints (cadr res)))
-            (if (>= k (- n 1))
-                ;;Test for fixation after enforcing all constraints
-                (until-fixation new-constraints new-environment
-                                (cons constraints environment)
-                                (+ 1 iter))
-                (lp (+ k 1) new-constraints new-environment))))))))
-
+          environment
+	  (let* ((env-subs (fold-left enforce-constraint (list environment '()) constraints)))
+	    (until-fixation (map (lambda (c) (multi-substitute-constraint (cadr env-subs) c))
+				 constraints)
+			    (car env-subs)
+			    (+ 1 iter)))))))
 #|
 (define test1
   '(lambda (x y)
@@ -259,7 +341,7 @@
 
 (pp (map record->list
          (cadr (enforce-all-constraints
-                (get-constraints-for prestest)))))
+                (get-constraints-for prestest-success)))))
 
 (ignore (enforce-all-constraints (get-constraints-for prestest-fail)))
 (ignore (enforce-all-constraints (get-constraints-for prestest-success)))
@@ -270,4 +352,3 @@
                  `(,(constraint:make 'b *equals* type:make-boolean)
                    ,(constraint:make 'a *equals* 'b)))
 |#
-

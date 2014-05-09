@@ -53,6 +53,10 @@
   (list type:boolean type:number type:char type:string
         type:symbol  type:pair   type:procedure))
 
+(define type:accessors-proc
+  (list type:boolean type:number type:char type:string
+        type:symbol  type:pair))
+
 (define (type:empty? type)
   (for-all?
     (map (lambda (acc) (acc type)) type:accessors)
