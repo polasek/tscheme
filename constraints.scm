@@ -296,21 +296,16 @@
 |#
 
 ;;Enforce constraints until fixed point is reached,
-;;Assumes length and ordering of constraints does not change.
 (define (enforce-all-constraints constraints)
-  (let ((n (length constraints)))
-    (let until-fixation ((constraints constraints)
-                         (environment base-environment)
-                         (iter 0))
-      ;;Exit condition
-;      (if (record-equal? (cons constraints environment) old) old ;;TODO fix this
-      (if (= iter 1000)
-          environment
-	  (let* ((env-subs (fold-left enforce-constraint (list environment '()) constraints)))
-	    (until-fixation (map (lambda (c) (multi-substitute-constraint (cadr env-subs) c))
-				 constraints)
-			    (car env-subs)
-			    (+ 1 iter)))))))
+  (let until-fixation ((constraints constraints)
+		       (environment base-environment))
+    (let* ((env-subs (fold-left enforce-constraint
+				(list environment '()) constraints)))
+      (if (tscheme:equal? environment (car env-subs))
+	  '*SUCCESS* ;; This could perhaps return the mapping or other values
+	  (until-fixation (map (lambda (c) (multi-substitute-constraint (cadr env-subs) c))
+			       constraints)
+			  (car env-subs))))))
 #|
 (define test1
   '(lambda (x y)
@@ -343,8 +338,8 @@
          (cadr (enforce-all-constraints
                 (get-constraints-for prestest-success)))))
 
-(ignore (enforce-all-constraints (get-constraints-for prestest-fail)))
-(ignore (enforce-all-constraints (get-constraints-for prestest-success)))
+(enforce-all-constraints (get-constraints-for prestest-fail))
+(enforce-all-constraints (get-constraints-for prestest-success))
 
 (print-recursive (get-constraints-for test1))
 

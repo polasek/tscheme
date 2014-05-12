@@ -16,25 +16,6 @@
   (pair       type:pair)
   (procedure  type:procedure))
 
-(define (record-equal? a b)
-  (cond ((and (pair? a) (pair? b))
-         (and (record-equal? (car a) (car b))
-              (record-equal? (cdr b) (cdr b))))
-        ((and (constraint? a) (constraint? b))
-         (and (record-equal? (constraint:left     a) (constraint:left b))
-              (record-equal? (constraint:relation a) (constraint:relation b))
-              (record-equal? (constraint:right    a) (constraint:right b))))
-        ((and (type? a) (type? b))
-         (and (record-equal? (type:boolean   a) (type:boolean b))
-              (record-equal? (type:number    a) (type:number b))
-              (record-equal? (type:char      a) (type:char b))
-              (record-equal? (type:string    a) (type:string b))
-              (record-equal? (type:symbol    a) (type:symbol b))
-              (record-equal? (type:pair      a) (type:pair b))
-              (record-equal? (type:procedure a) (type:procedure b))))
-        (else (eqv? a b))))
-
-
 ;;A generic map over any record type
 ;;Dangerous and order-dependent, but compact
 (define (record-map ordered-accessors)
@@ -64,6 +45,37 @@
 
 (define type:map (record-map type:accessors))
 (define type:tagged-map (record-tagged-map type:accessors))
+
+;;I think the easiest way to have an equality over records is to define
+;;a dynamic dispatch procedure over record and other types.
+;;To distinguish this from standard scheme equality, we use tscheme:eq?
+(define tscheme:equal?
+  (make-generic-operator 2
+                         'tscheme:equal?
+                         equal?))
+;;lists
+(defhandler tscheme:equal? (lambda (l1 l2)
+                             (or (and (null? l1) (null? l2))
+                                 (and (pair? l1) (pair? l2)
+                                      (tscheme:equal? (car l1) (car l2))
+                                      (tscheme:equal? (cdr l1) (cdr l2)))))
+  list? list?)
+
+;;A generic defhandler for any record type. Could be implemented a tad
+;;more efficiently (terminating when failure is detected), but that
+;;sort of optimization is not really needed here.
+(define (defhandler-tscheme:equal? accessors member?)
+  (defhandler tscheme:equal? (lambda (t1 t2)                           
+                               (for-all?
+                                (map tscheme:equal?                               
+                                     (map (lambda (acc) (acc t1)) accessors)
+                                     (map (lambda (acc) (acc t2)) accessors))
+                                identity))
+    member? member?))
+
+;;Define equal for the type record.
+(defhandler-tscheme:equal? type:accessors type?)
+
 
 #|
 (pp (type:tagged-map list type:top type:make-boolean))
