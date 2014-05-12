@@ -23,7 +23,7 @@
          (if (not (= (length typeA) (length typeB)))
              (report-failure
                "Cannot unify: procedures have different number of arguments")
-             typeA)) ;;Simply return the first one. TODO make sure this is correct
+             typeA)) ;;Simply return the first one.
         (else (intersect-finite-sets typeA typeB))))
 
 ;;Collect pairs of type variables from procedure types that have to be
@@ -38,15 +38,6 @@
                pA pB)
           symbol?)
         '())))
-
-(define (union-type type-tag typeA typeB)
-  (cond ((or (eqv? typeA *all*) (eqv? typeB *all*)) *all*)
-        ((eqv? typeA *none*) typeB)
-	((eqv? typeB *none*) typeA)
-        ((eq? type-tag type:procedure)
-         ;;TODO rewrite similarly as intersect-type
-         (error "TODO union procedure types"))
-        (else (union-finite-sets typeA typeB))))
 
 ;;Computes the intersection of two types, does not recurse on function
 ;;arguments/return types
@@ -209,16 +200,8 @@
 ;;Changes: enforce-constraint takes a single constraint and the environment
 ;;and returns a list of substitutions.
 
-;;TODO I am not entirely sure about adding constraints this way. I think it
-;;should work for requires and equals, it might not work for permits in some
-;;cases.
-;;As we might loop over the constraints and look for a fix point, we
-;;probably should not be adding these constraints in but should only process
-;;them.
-;;Processes one constraint passed as the constraint argument,
-;;doesn't examine other constraints (only substitutes into them, if appropriate).
-;;I factored the code out so that it handles all types of constraints, although
-;;it is probably just more confusing and complicated now.
+;; First argument is a pair of environment and current substitutions,
+;; the second one is a constraint which hasn't yet been substituted into.
 (define (enforce-constraint env-subs constraint_)
   (let* ((environment (car env-subs))
 	 (prev_subs   (cadr env-subs)) ;;Previously made substitutions on this run
@@ -236,8 +219,6 @@
                        (lookup-variable environment right)
                        right))
                (newType (intersect tA tB))
-               ;;In the case of permits, simply adding these new
-               ;;relations is not correct. TODO fix that.
                (newConstraints
 		(if (or (not (eq? ctype *permits*))
 			(for-all? type:accessors-proc
@@ -265,24 +246,14 @@
 		     newType)		    
 		    environment)))
           (if (type:empty? newType)
-              ;;TODO enforcing that the returned type is not empty.
               (report-failure
                 "There is no possible type for this variable")
-	      ;;Process the newly generated constraitns (they won't be
+	      ;;Process the newly generated constraints (they won't be
 	      ;; kept for running to convergence, once processed,
 	      ;; these generated constraints are thrown away).
 	      (fold-left enforce-constraint
 			 (list newEnvironment subs)
 			 newConstraints))))))
-;;If my understanding of the difference between equals and requires is correct,
-;;then the difference in the implementation is that if requires is of form
-;;tvar1 requires tvar2, we do not substitute one for the other. Otherwise, the two
-;;should be the same, I think. Permits then doesn't update any bindings whatsoever,
-;;only checks that the intersections are non-empty.
-
-;;Gets passed substitutions as an additional argument.
-;;Assumes that subs have been performed on environment but not
-;;on the constraint.
 
 #|
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
