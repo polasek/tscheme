@@ -1,3 +1,10 @@
+;;; Description of the extra fields:
+;;; * identifiers: a finite-set of numbers that serve as names for the
+;;; constraint
+;;; * usercode: the code that produced this constraint
+;;; * left-annotation: snippet of user code (or some human-readable
+;;; abbreviation thereof) representing left
+;;; * right-annotation: same as left-annotation, but for right
 (define-record-type constraint
     (constraint:make% left relation right identifiers
                       usercode left-annotation right-annotation)
