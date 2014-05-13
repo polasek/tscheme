@@ -18,6 +18,24 @@ Tscheme: Using type inference to automatically complain about the programmer's c
 \author{Aaron Graham-Horowitz, Ben Zinberg, Jan Polášek}
 \maketitle
 
-sadfsad
+\newpage
+
+\section{Introduction}
+
+Tscheme is a static code analyser over a subset of MIT Scheme
+that aims to reduce the number of bugs in user's code.
+It uses static type analysis to derive supersets of values that can be taken on by
+(sub)expressions.
+If an empty set is derived, a type error is bound to happen and the error is reported.
+If the derived set of values is non-empty, the user is allowed to query the sets of
+values expressions can take on to get more information about the code they have written.
+
+There are two common ways of doing static analysis.
+One approach is static typing, which imposes type rules which are
+over-approximations of what can happen in correct programs.
+A good static typing scheme will provide some sort of type safety,
+guarantees that will be enforced and that the programmer can rely on.
+It is for example possible to statically determine that an integer plus
+operator will never be ca
 
 \end{document}
