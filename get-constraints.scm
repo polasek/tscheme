@@ -22,6 +22,13 @@
     (tscheme:process-expr expr *base-cvmap*)
     *the-constraints*))
 
+;;; For testing purposes
+(define (capture-constraints thunk)
+  (fluid-let ((*the-constraints* '())
+              (**type-var-counter** 0))
+    (thunk)
+    *the-constraints*))
+
 (define (add-constraint constraint)
   (set! *the-constraints* (cons constraint *the-constraints*)))
 
@@ -130,6 +137,51 @@
 (defhandler tscheme:process-expr tscheme:process-self-quoting number?)
 (defhandler tscheme:process-expr tscheme:process-self-quoting string?)
 
+(define (tscheme:process-quote expr cvmap)
+  (let ((tv (fresh))
+        (contents (quoted-expr-contents expr)))
+   (add-constraint
+     (constraint:make-equal
+       tv
+       ;; In our implementation, pairs cannot contain finite sets
+       (if (pair? contents)
+         type:make-pair
+         (singleton:make contents))))
+   (tv&cvmap:make tv cvmap)))
+
+#|
+(let ((x (capture-constraints
+           (lambda ()
+             (tscheme:process-quote '(quote (hello goodbye)) (cvmap:make)))))
+      (y (capture-constraints
+           (lambda ()
+             ;; lol macros within macros
+             (tscheme:process-quote ''a (cvmap:make))))))
+  (pp (constraint:right (car x)))
+  (newline)
+  (pp (constraint:right (car y))))
+
+#[type 2]
+(boolean none)
+(number none)
+(char none)
+(string none)
+(symbol none)
+(pair all)
+(procedure none)
+
+#[type 3]
+(boolean none)
+(number none)
+(char none)
+(string none)
+(symbol (finite-set a))
+(pair none)
+(procedure none)
+|#
+
+(defhandler tscheme:process-expr tscheme:process-quote quote?)
+
 ;;; Handler for lambda expressions
 (define (tscheme:process-lambda expr cvmap)
   (let ((lambda-tv (fresh-procvar)) ; points to the procedure object created by
@@ -149,8 +201,8 @@
        #!unspecific
        (let ((arg-cv (car remaining-args))
              (arg-tv (fresh-argvar)))
-         (set! arg-tvs (append (list arg-tv)
-                               arg-tvs))
+         (set! arg-tvs (append arg-tvs
+                               (list arg-tv)))
          (set! inner-cvmap (cvmap:bind inner-cvmap arg-cv arg-tv))
          (lp (cdr remaining-args)))))
 
@@ -212,9 +264,9 @@
 
 (defhandler tscheme:process-expr tscheme:process-variable variable?)
 
-;;; Handler for applications.
+;;; Handler for applications (i.e., combinations).
 ;;;
-;;; Plan:
+;;; Outline of the logic:
 ;;; Operator permits procedure.
 ;;; Allocate fresh variable r for the return of this application.
 ;;; Then r requires (ret operator).
@@ -258,39 +310,6 @@
               (cdr remaining-args)
               arg-value-cvmap))))))
 
-(define (display-constraint constraint)
-  (display "CONSTRAINT(")
-  (display (constraint:left constraint))
-  (display " ")
-  (display (constraint:relation constraint))
-  (display " ")
-  (display (constraint:right constraint))
-  (display ")"))
-
-(define (print-constraint constraint)
-  (display-constraint constraint)
-  (newline))
-
-#|
-(print-constraint (constraint:make-require 'a 'b))
-|#
-
-(define (print-recursive x)
-  (define (print-recursive-with-prefix y prefix)
-    (cond ((list? y)
-           (let ((new-prefix (string-append "   " prefix)))
-            (display prefix)
-            (display "(")
-            (newline)
-            (for-each (lambda (elt)
-                        (print-recursive-with-prefix elt new-prefix))
-                      y)
-            (display prefix)
-            (display ")")
-            (newline)))
-          ((constraint? y) (display prefix) (print-constraint y))
-          (else (display prefix) (write-line y))))
-  (print-recursive-with-prefix x ""))
 
 #|
 (print-recursive `(a b (,(constraint:make-require 1 2) (d)) e))
