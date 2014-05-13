@@ -47,18 +47,30 @@
   (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
-(define base-environment `((number  ,type:make-number)
-                           (string  ,type:make-string)                           
-                           (plus    ,(type:make-procedure 'number '(number number)))
-                           (minus   ,(type:make-procedure 'number '(number number)))
-                           (string-append ,(type:make-procedure 'string '(string string)))))
+
+;;TODO: Find a better way to identify parts of the base env
+(define base-constraint-id (finite-set 0))
+
+(define base-environment `((number  (,type:make-number ,(finite-set -1)))
+                           (string  (,type:make-string ,(finite-set -2)))
+                           (plus    (,(type:make-procedure 'number '(number number))
+                                     ,(finite-set -3)))
+                           (minus   (,(type:make-procedure 'number '(number number))
+                                     ,(finite-set -4)))
+                           (string-append (,(type:make-procedure
+                                              'string '(string string))
+                                           ,(finite-set -5)))))
 
 (define (lookup-variable environment var)
   (let ((res (assv var environment)))
-    (if (eq? res #f) type:top (cadr res))))
+    (if res (caadr res) type:top)))
 
-(define (update-variable environment var type)
-  (cons (list var type) (del-assv var environment)))
+(define (lookup-variable-ids environment var)
+  (let ((res (assv var environment)))
+    (if res (cadadr res) base-constraint-id)))
+
+(define (update-variable environment var type ids)
+  (cons (list var (list type ids)) (del-assv var environment)))
 
 (define (lookup-proc-variable env v)
   (cond ((type? v) v)
@@ -76,9 +88,16 @@
         (else (begin (pp v)
                      (report-failure "Programmer error. I suck.")))))
 
-(define (substitute-into-environment environment old new)
+(define (substitute-into-environment environment old new ids)
   (map (lambda (mapping)
-         (list (car mapping) (substitute-into-type (cadr mapping) old new)))
+         (let* ((m-type (caadr mapping))
+                (new-type (substitute-into-type m-type old new))
+                (m-ids (cadadr mapping))
+                ;; Update ids iff a substitution was made
+                (new-ids (if (tscheme:equal? new-type m-type)
+                             m-ids
+                             (union-finite-sets ids m-ids))))
+           (list (car mapping) (list new-type new-ids))))
        environment))
 
 (define (substitute-into-type type old new)
@@ -147,17 +166,18 @@
   (if (null? subsB)
       subsA
       (append
-       (map (lambda (a)
-	      (list (car a)
-		    (fold-left (lambda (v b)
-				 (if (eq? (car b) v) 
+        (map (lambda (a)
+               (cons (car a)
+                     (fold-left (lambda (v b)
+                                  (if (eq? (car b) (car v))
 				     ;;If there is something substituting for our
 				     ;;result later, we might as well do it
-				     (cadr b) ;;straight away.
-				     v))
-			       (cadr a)
-			       subsB)))
-	    subsA)  
+				      (list (cadr b) ;straight away.
+                                            (union-finite-sets (caddr b) (cadr v)))
+				      v))
+                                  (cdr a)
+                                  subsB)))
+              subsA)
        ;;Remove all elements from b that have been already substituted for by a.
        (list-transform-negative 
 	   subsB
@@ -170,6 +190,7 @@
       (list a)
       (cons (car l) (cons-last a (cdr l)))))
 
+;; XXX: If we're going to use this, must update to track ids
 (define (add-substitution subs sub)
   (let ((subs-comp
 	 (map (lambda (s)
@@ -185,16 +206,28 @@
   (if (null? subs)
       environment
       (multi-substitute-into-environment
-       (substitute-into-environment environment (caar subs) (cadar subs))
-       (cdr subs))))
+        (substitute-into-environment
+          environment (caar subs) (cadar subs) (caddar subs))
+        (cdr subs))))
 
 #|
-(compose-substitutions '((a b) (c d) (e f)) '((g h) (i j) (k l)))
-;Value 17: ((a b) (c d) (e f) (g h) (i j) (k l))
-(compose-substitutions '((a b) (c d) (e f)) '((b h) (c j) (f l)))
-;Value 19: ((a h) (c d) (e l) (b h) (f l))
-(compose-substitutions '((a b) (c d) (e f)) '((a h) (c j) (e l)))
-;Value 20: ((a b) (c d) (e f))
+(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
+                                                   (e f ,(finite-set 3)))
+                           `((g h ,(finite-set 4)) (i j ,(finite-set 5))
+                                                   (k l ,(finite-set 6)))))
+;((a b (finite-set 1)) (c d (finite-set 2)) (e f (finite-set 3))
+; (g h (finite-set 4)) (i j (finite-set 5)) (k l (finite-set 6)))
+(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
+                                                   (e f ,(finite-set 3)))
+                           `((b h ,(finite-set 4)) (c j ,(finite-set 5))
+                                                   (f l ,(finite-set 6)))))
+;((a h (finite-set 1 4)) (c d (finite-set 2)) (e l (finite-set 3 6))
+;                        (b h (finite-set 4)) (f l (finite-set 6)))
+(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
+                                                   (e f ,(finite-set 3)))
+                           `((a h ,(finite-set 4)) (c j ,(finite-set 5))
+                                                   (e l ,(finite-set 6)))))
+;((a b (finite-set 1)) (c d (finite-set 2)) (e f (finite-set 3)))
 |#
 
 ;;Changes: enforce-constraint takes a single constraint and the environment
@@ -209,7 +242,8 @@
 	 (constraint (multi-substitute-constraint prev_subs constraint_))
 	 (left  (lookup-proc-variable environment (constraint:left constraint)))
          (right (lookup-proc-variable environment (constraint:right constraint)))
-         (ctype (constraint:relation constraint)))
+         (ctype (constraint:relation constraint))
+         (ids   (constraint:ids constraint)))
     (if (or (not left) (not right) (eqv? left right))
 	;;Two of the same variable, or no info about arg/ret -> do nothing
 	(list environment prev_subs)
@@ -233,7 +267,7 @@
 		    '()))
 	       ;;A new substitution
 	       (newSub (if (and (eq? ctype *equals*) (symbol? right))
-			   `((,left ,right))
+			   `((,left ,right ,ids))
 			   '()))
 	       ;;Aggregate the new substitution (if any) with exisiting ones
 	       (subs (compose-substitutions prev_subs newSub))
@@ -243,7 +277,8 @@
 		    (update-variable
 		     (multi-substitute-into-environment environment newSub)
 		     left
-		     newType)		    
+		     newType
+                     ids)
 		    environment)))
           (if (type:empty? newType)
               (report-failure
@@ -255,6 +290,7 @@
 			 (list newEnvironment subs)
 			 newConstraints))))))
 
+;TODO: New tests
 #|
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
 (pp (map record->list
@@ -273,8 +309,10 @@
     (let* ((env-subs (fold-left enforce-constraint
 				(list environment '()) constraints)))
       (if (tscheme:equal? environment (car env-subs))
-	  '*SUCCESS* ;; This could perhaps return the mapping or other values
-	  (until-fixation (map (lambda (c) (multi-substitute-constraint (cadr env-subs) c))
+	  ;'*SUCCESS* ;; This could perhaps return the mapping or other values
+          environment
+	  (until-fixation (map (lambda (c)
+                                 (multi-substitute-constraint (cadr env-subs) c))
 			       constraints)
 			  (car env-subs))))))
 #|
@@ -300,14 +338,15 @@
     3
     "a"))
 
-(pp (map record->list
-         (cadr (enforce-all-constraints
-                 `(,(constraint:make 'b *equals* type:make-boolean)
-                   ,(constraint:make 'a *equals* 'b))))))
+(pp (map (lambda (m)
+           (list (car m) (record->list (caadr m)) (cadadr m)))
+         (enforce-all-constraints
+           `(,(constraint:make 'b *equals* type:make-boolean)
+             ,(constraint:make 'a *equals* 'b)))))
 
-(pp (map record->list
-         (cadr (enforce-all-constraints
-                (get-constraints-for prestest-success)))))
+(pp (map (lambda (m)
+           (list (car m) (record->list (caadr m)) (cadadr m)))
+         (enforce-all-constraints (get-constraints-for prestest-success))))
 
 (enforce-all-constraints (get-constraints-for prestest-fail))
 (enforce-all-constraints (get-constraints-for prestest-success))
