@@ -136,7 +136,7 @@
 (define (finite-set . elts)
   (make-finite-set% elts))
 
-(define (type:finite-set? ob)
+(define (type:finite-set? obj)
   (and (list? obj)
        (not (null? obj))
        (eqv? (car obj) 'finite-set)))

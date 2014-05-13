@@ -5,13 +5,19 @@
   (error msg))
 
 ;;Takes two finite sets of the same type
-(define (intersect-finite-sets setA setB)
+(define (intersect-two-finite-sets setA setB)
   (make-finite-set%
     (general-sort (filter (lambda (e) (memv e (cdr setB))) (cdr setA)))))
 
-(define (union-finite-sets setA setB)
+(define (intersect-finite-sets . sets)
+  (reduce-left intersect-two-finite-sets #f (filter type:finite-set? sets)))
+
+(define (union-two-finite-sets setA setB)
   (make-finite-set%
     (dedup (general-sort (append (cdr setA) (cdr setB))))))
+
+(define (union-finite-sets . sets)
+  (reduce-left union-two-finite-sets #f (filter type:finite-set? sets)))
 
 ;; Requires recursive execution on procedure arguments and return types, if present.
 ;; This method is non-recursive and ignores those - they are handled separately.
@@ -49,8 +55,6 @@
 (define empty-environment '())
 
 ;;TODO: Find a better way to identify parts of the base env
-(define base-constraint-id (finite-set 0))
-
 (define base-environment `((number  (,type:make-number ,(finite-set -1)))
                            (string  (,type:make-string ,(finite-set -2)))
                            (plus    (,(type:make-procedure 'number '(number number))
@@ -67,7 +71,7 @@
 
 (define (lookup-variable-ids environment var)
   (let ((res (assv var environment)))
-    (if res (cadadr res) base-constraint-id)))
+    (if res (cadadr res) #f)))
 
 (define (update-variable environment var type ids)
   (cons (list var (list type ids)) (del-assv var environment)))
@@ -110,34 +114,47 @@
                          t))
                    type))
 
-(define (substitute-constraint old new constraint)
-  (let* ((left (constraint:left constraint))
-	 (ctype (constraint:relation constraint))
-                (right (constraint:right constraint)))
+(define (substitute-constraint old new ids    constraint)
+  (let* ((left        (constraint:left        constraint))
+	 (ctype       (constraint:relation    constraint))
+         (right       (constraint:right       constraint))
+         (usercode    (constraint:usercode    constraint))
+         (left-annot  (constraint:left-annot  constraint))
+         (right-annot (constraint:right-annot constraint))
+         (new-ids     (union-finite-sets (constraint:ids constraint) ids)))
     (cond ((equal? left old)
-	   (constraint:make new ctype right))
+	   (constraint:make-with-ids
+             new ctype right new-ids usercode left-annot right-annot))
 	  ((and (tv-ret? left) (equal? (tv-proc-name left) old))
-	   (constraint:make (return-type new) ctype right))
+	   (constraint:make-with-ids
+             (return-type new) ctype right new-ids usercode left-annot right-annot))
 	  ((and (tv-arg? left) (equal? (tv-proc-name left) old))
-	   (constraint:make (arg-of new (tv-arg-num left)) ctype right))
+	   (constraint:make-with-ids
+             (arg-of new (tv-arg-num left)) ctype right
+             new-ids usercode left-annot right-annot))
 	  ((equal? right old)
-	   (constraint:make left ctype new))
+	   (constraint:make-with-ids
+             left ctype new new-ids usercode left-annot right-annot))
 	  ((and (tv-ret? right) (equal? (tv-proc-name right) old))
-	   (constraint:make left ctype (return-type new)))
+	   (constraint:make-with-ids
+             left ctype (return-type new) new-ids usercode left-annot right-annot))
 	  ((and (tv-arg? right) (equal? (tv-proc-name right) old))
-	   (constraint:make left ctype (arg-of new (tv-arg-num left))))
+	   (constraint:make-with-ids
+             left ctype (arg-of new (tv-arg-num left))
+             new-ids usercode left-annot right-annot))
 	  (else constraint))))
 
-(define (substitute-constraints old new constraints)
-  (map (lambda (c) (substitute-constraint old new c)) constraints))
+(define (substitute-constraints old new ids constraints)
+  (map (lambda (c) (substitute-constraint old new ids c)) constraints))
 
 (define (multi-substitute-constraint subs constraint)
   (if (null? subs)
       constraint
       (multi-substitute-constraint
        (cdr subs)
-       (substitute-constraint (caar subs) (cadar subs) constraint))))
+       (substitute-constraint (caar subs) (cadar subs) (caddar subs) constraint))))
 
+;; TODO: New tests
 #|
 (pp (cadr (substitute-constraints
             'a 'b `(,(constraint:make 'a 'equals 'b)
@@ -252,6 +269,9 @@
                (tB (if (symbol? right)
                        (lookup-variable environment right)
                        right))
+               (left-ids (lookup-variable-ids environment left))
+               (right-ids (lookup-variable-ids environment right))
+               (all-ids (union-finite-sets ids left-ids right-ids))
                (newType (intersect tA tB))
                (newConstraints
 		(if (or (not (eq? ctype *permits*))
@@ -261,13 +281,13 @@
 		    ;;requires a check on procedure arguments.
 		    (map
 		     (lambda (l-and-r)
-		       (constraint:make
-			(car l-and-r) ctype (cadr l-and-r)))
+		       (constraint:make-with-ids
+                         (car l-and-r) ctype (cadr l-and-r) all-ids))
 		     (collect-proc-types tA tB))
 		    '()))
 	       ;;A new substitution
 	       (newSub (if (and (eq? ctype *equals*) (symbol? right))
-			   `((,left ,right ,ids))
+			   `((,left ,right ,all-ids))
 			   '()))
 	       ;;Aggregate the new substitution (if any) with exisiting ones
 	       (subs (compose-substitutions prev_subs newSub))
@@ -278,7 +298,7 @@
 		     (multi-substitute-into-environment environment newSub)
 		     left
 		     newType
-                     ids)
+                     all-ids)
 		    environment)))
           (if (type:empty? newType)
               (report-failure
@@ -310,7 +330,7 @@
 				(list environment '()) constraints)))
       (if (tscheme:equal? environment (car env-subs))
 	  ;'*SUCCESS* ;; This could perhaps return the mapping or other values
-          environment
+          (list environment constraints)
 	  (until-fixation (map (lambda (c)
                                  (multi-substitute-constraint (cadr env-subs) c))
 			       constraints)
@@ -338,15 +358,23 @@
     3
     "a"))
 
-(pp (map (lambda (m)
-           (list (car m) (record->list (caadr m)) (cadadr m)))
-         (enforce-all-constraints
+(let ((p (enforce-all-constraints (get-constraints-for prestest-success))))
+  (map print-constraint (cadr p))
+  (map (lambda (m)
+         (pp (list (car m) (record->list (caadr m)) (cadadr m)))
+         (read))
+       (car p))
+  (map print-constraint (cadr p)))
+
+(let ((p (enforce-all-constraints
            `(,(constraint:make 'b *equals* type:make-boolean)
              ,(constraint:make 'a *equals* 'b)))))
-
-(pp (map (lambda (m)
-           (list (car m) (record->list (caadr m)) (cadadr m)))
-         (enforce-all-constraints (get-constraints-for prestest-success))))
+  (map print-constraint (cadr p))
+  (map (lambda (m)
+         (pp (list (car m) (record->list (caadr m)) (cadadr m)))
+         (read))
+       (car p))
+  (map print-constraint (cadr p)))
 
 (enforce-all-constraints (get-constraints-for prestest-fail))
 (enforce-all-constraints (get-constraints-for prestest-success))
