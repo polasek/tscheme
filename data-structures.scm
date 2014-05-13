@@ -219,14 +219,20 @@
 (define (fresh-retvar) (fresh 'retvar))
 (define (fresh-procvar) (fresh 'proc))
 
-(define (constraint:make-equal left right)
-  (constraint:make left *equals* right))
+(define (constraint:make-equal left right
+                               #!optional usercode left-annot right-annot)
+  (constraint:make left *equals* right
+                   usercode left-annot right-annot))
 
-(define (constraint:make-require left right)
-  (constraint:make left *requires* right))
+(define (constraint:make-require left right
+                               #!optional usercode left-annot right-annot)
+  (constraint:make left *requires* right
+                   usercode left-annot right-annot))
 
-(define (constraint:make-permit left right)
-  (constraint:make left *permits* right))
+(define (constraint:make-permit left right
+                               #!optional usercode left-annot right-annot)
+  (constraint:make left *permits* right
+                   usercode left-annot right-annot))
 
 
 ;;; Abstractions for dealing with ret and arg references

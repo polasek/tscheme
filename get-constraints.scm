@@ -166,7 +166,8 @@
 (define (tscheme:process-self-quoting expr cvmap)
   (let ((tv (fresh)))
    (add-constraint (constraint:make-equal tv
-                                          (singleton:make expr)))
+                                          (singleton:make expr)
+                                          expr))
    (tv&cvmap:make tv cvmap)))
 
 #|
@@ -184,7 +185,8 @@
        ;; In our implementation, pairs cannot contain finite sets
        (if (pair? contents)
          type:make-pair
-         (singleton:make contents))))
+         (singleton:make contents))
+       expr))
    (tv&cvmap:make tv cvmap)))
 
 #|
@@ -248,14 +250,16 @@
     ;; procedure are
     (add-constraint
       (constraint:make-equal lambda-tv
-                             (tscheme:make-proc-type ret-tv arg-tvs)))
+                             (tscheme:make-proc-type ret-tv arg-tvs)
+                             expr))
 
     ;; Recurse into the body, and say what we can about the return type of the
     ;; last expression (again, we assume that the body is wrapped in a begin)
     (add-constraint
       (constraint:make-require
         ret-tv
-        (tv&cvmap:tv (tscheme:process-expr (lambda-body expr) inner-cvmap))))
+        (tv&cvmap:tv (tscheme:process-expr (lambda-body expr) inner-cvmap))
+        expr))
 
     ;; We use the outer cvmap because we are returning to the scope outside the
     ;; body of our lambda.
@@ -319,11 +323,15 @@
          (return-tv (fresh)))
     ;; Operator must be a procedure
     (add-constraint
-      (constraint:make-permit operator-tv *procedure*))
+      (constraint:make-permit operator-tv
+                              *procedure*
+                              expr))
     ;; The value produced will always be an element of the return type of
     ;; operator
     (add-constraint
-      (constraint:make-require return-tv (return-type operator-tv)))
+      (constraint:make-require return-tv
+                               (return-type operator-tv)
+                               expr))
     ;; The order in which we evaluate the arguments is unspecified, but we do
     ;; need to keep track of updates to the cvmap throughout this process.
     (let lp ((i 0)
@@ -341,9 +349,11 @@
             ;; everything else, we use permit
             (if (variable? arg-value-expr)
               (constraint:make-require arg-value-tv
-                                       arg-tv)
+                                       arg-tv
+                                       expr)
               (constraint:make-permit arg-tv
-                                      arg-value-tv)))
+                                      arg-value-tv
+                                      expr)))
           (lp (+ i 1)
               (cdr remaining-args)
               arg-value-cvmap))))))

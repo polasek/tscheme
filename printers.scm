@@ -4,15 +4,37 @@
   (display "CONSTRAINT[")
   (write (finite-set-elts (constraint:ids constraint)))
   (display "](")
+
   (write (constraint:left constraint))
+
   (display " ")
   (display (constraint:relation constraint))
   (display " ")
+  
   (let ((right (constraint:right constraint)))
    (if (type? right)
      (print-type right)
      (write right)))
-  (display ")"))
+  
+  (display ")")
+  
+  (let ((left-annot (constraint:left-annot constraint))
+        (right-annot (constraint:right-annot constraint))
+        (usercode (constraint:usercode constraint)))
+    (if (not (default-object? left-annot))
+      (begin
+        (display " LEFT ")
+        (write left-annot)))
+
+    (if (not (default-object? right-annot))
+      (begin
+        (display " RIGHT ")
+        (write right-annot)))
+    
+    (if (not (default-object? usercode))
+      (begin
+        (display " FROM CODE ")
+        (write usercode)))))
 
 (define (print-constraint constraint)
   (display-constraint constraint)
