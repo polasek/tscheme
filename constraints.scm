@@ -358,7 +358,7 @@
     3
     "a"))
 
-(let ((p (enforce-all-constraints (get-constraints-for prestest-success))))
+(let ((p (enforce-all-constraints (car (get-constraints-for prestest-success)))))
   (map print-constraint (cadr p))
   (map (lambda (m)
          (pp (list (car m) (record->list (caadr m)) (cadadr m)))
@@ -376,10 +376,10 @@
        (car p))
   (map print-constraint (cadr p)))
 
-(enforce-all-constraints (get-constraints-for prestest-fail))
-(enforce-all-constraints (get-constraints-for prestest-success))
+(enforce-all-constraints (car (get-constraints-for prestest-fail)))
+(enforce-all-constraints (car (get-constraints-for prestest-success)))
 
-(print-recursive (get-constraints-for test1))
+(print-recursive (car (get-constraints-for test1)))
 
 (enforce-all-constraints
                  `(,(constraint:make 'b *equals* type:make-boolean)
