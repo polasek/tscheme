@@ -15,16 +15,20 @@
     (string-append string-append)
     (- minus)))
 
+(define *query-map* '())
+
 ;;; This is what we'll use to process pieces of code
 (define (get-constraints-for expr)
   (fluid-let ((*the-constraints* '())
+              (*query-map* (qmap:make))
               (**type-var-counter** 0))
     (tscheme:process-expr expr *base-cvmap*)
-    *the-constraints*))
+    (list *the-constraints* *query-map*)))
 
 ;;; For testing purposes
 (define (capture-constraints thunk)
   (fluid-let ((*the-constraints* '())
+              (*query-map* (qmap:make))
               (**type-var-counter** 0))
     (thunk)
     *the-constraints*))
@@ -60,6 +64,17 @@
        (pp key)
        #f))))
 
+;;; Abstractions for query map (later, should refactor so that the same
+;;; structure is used for cvmap and this)
+(define (qmap:make)
+  '())
+
+(define (qmap:bind cvmap key val)
+  (cons `(,key ,val) cvmap))
+
+(define (add-to-qmap key val)
+  (set! *query-map* (qmap:bind *query-map* key val)))
+
 ;;; Helpers for dispatching on the type of code fragment we see
 
 (define (tagged-list? expr tag)
@@ -67,6 +82,20 @@
        (not (null? expr))
        (symbol? (car expr))
        (eq? (car expr) tag)))
+
+(define (query? expr)
+  (tagged-list? expr 'query))
+
+(define (query-name expr)
+  (cadr expr))
+
+(define (query-item expr)
+  (caddr expr))
+
+(define (self-quoting? expr)
+  (or (number? expr)
+      (string? expr)
+      (char? expr)))
 
 (define (lambda? expr)
   (tagged-list? expr 'lambda))
@@ -123,6 +152,16 @@
                          (lambda (expr cvmap)
                            (tscheme:process-application expr cvmap))))
 
+;; To process a query, just process the item and then add a binding to the
+;; query map
+(define (tscheme:process-query expr cvmap)
+  (let ((qname (query-name expr))
+        (qitem (query-item expr)))
+    (let ((tv&cvmap (tscheme:process-expr qitem cvmap)))
+     (add-to-qmap qname (tv&cvmap:tv tv&cvmap))
+     tv&cvmap)))
+
+(defhandler tscheme:process-expr tscheme:process-query query?)
 
 (define (tscheme:process-self-quoting expr cvmap)
   (let ((tv (fresh)))
@@ -134,8 +173,7 @@
 (define x (tscheme:process-self-quoting 3 (cvmap:make)))
 |#
 
-(defhandler tscheme:process-expr tscheme:process-self-quoting number?)
-(defhandler tscheme:process-expr tscheme:process-self-quoting string?)
+(defhandler tscheme:process-expr tscheme:process-self-quoting self-quoting?)
 
 (define (tscheme:process-quote expr cvmap)
   (let ((tv (fresh))
