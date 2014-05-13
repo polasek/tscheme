@@ -218,6 +218,7 @@
 (define (fresh-argvar) (fresh 'argvar))
 (define (fresh-retvar) (fresh 'retvar))
 (define (fresh-procvar) (fresh 'proc))
+(define (fresh-branchvar) (fresh 'branch))
 
 (define (constraint:make-equal left right
                                #!optional usercode left-annot right-annot)

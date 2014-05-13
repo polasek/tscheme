@@ -60,6 +60,37 @@
 (define (rw:make-application operator operands)
   (cons operator operands))
 
+(define (rw:make-if pred consequent alternative)
+  (list 'if pred consequent alternative))
+
+(define (cond? expr)
+  (tagged-list? expr 'cond))
+
+;;; I tried to write my own version of cond->if, but it wasn't as nice as the
+;;; one in ps04
+(define (rw:cond->if cond-expr)
+  (define (clauses cndl) (cdr cndl))
+  (define (no-clauses? clauses) (null? clauses))
+  (define (first-clause clauses) (car clauses))
+  (define (rest-clauses clauses) (cdr clauses))
+  (define (else-clause? clause) (eq? (predicate clause) 'else))
+  (define (predicate clause) (car clause))
+  (define (actions clause)
+
+  (rw:sequence->begin (cdr clause)))
+  (define (expand clauses)
+    (cond ((no-clauses? clauses)
+           '|#!unspecific|)
+	  ((else-clause? (car clauses))
+	   (if (no-clauses? (cdr clauses))
+	       (actions (car clauses))
+	       (error "else clause isn't last -- INTERP" cond-expr)))
+	  (else
+	   (rw:make-if (predicate (car clauses))
+                       (actions (car clauses))
+                       (expand (cdr clauses))))))
+  (expand (clauses cond-expr)))
+
 (define rw:rewrite
   (make-generic-operator 1
                          'rw:rewrite
@@ -120,6 +151,11 @@
   expr)
 
 (defhandler rw:rewrite rw:rewrite-variable variable?)
+
+(define (rw:rewrite-cond expr)
+  (rw:rewrite (rw:cond->if expr)))
+
+(defhandler rw:rewrite rw:rewrite-cond cond?)
 
 (define (rw:rewrite-application expr)
   (rw:make-application
