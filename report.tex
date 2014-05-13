@@ -6,7 +6,6 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsthm}
-\usepackage{algorithm2e}
 \usepackage{listings}
 \pagestyle{myheadings}
 \markright{}
@@ -36,6 +35,17 @@ over-approximations of what can happen in correct programs.
 A good static typing scheme will provide some sort of type safety,
 guarantees that will be enforced and that the programmer can rely on.
 It is for example possible to statically determine that an integer plus
-operator will never be ca
+operator will never be called with a string passed as an argument.
+The disadvantage of any reasonable type system over any powerful enough language
+is that there will always be valid programs that never violate the notion of
+type safety the type system guarantees that will not pass the type check.
+That is the type checker will never produce false-positives,
+but can produce false-negatives.
+As we wanted to have a static analyser that works on an existing Scheme
+language (or a subset of), we decided to go in the other direction,
+which is a code analyser.
+Unlike a type checker, a code analyser will never produce false-negatives,
+but can produce false-positive results.
+
 
 \end{document}
