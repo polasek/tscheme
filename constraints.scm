@@ -1,8 +1,8 @@
 ;;; Analyze constraints to generate typing information
 
 ;; A placeholder for type failure. Will probably have additional arguments later.
-(define (report-failure msg)
-  (error msg))
+(define (report-failure v env ids fail)
+  (fail (union-finite-sets (lookup-variable-ids env v) ids)))
 
 ;;Takes two finite sets of the same type
 (define (intersect-two-finite-sets setA setB)
@@ -76,7 +76,7 @@
 (define (update-variable environment var type ids)
   (cons (list var (list type ids)) (del-assv var environment)))
 
-(define (lookup-proc-variable env v)
+(define (lookup-proc-variable env v ids fail)
   (cond ((type? v) v)
         ((symbol? v) v)
         ((or (tv-ret? v) (tv-arg? v))
@@ -85,12 +85,13 @@
                        0
                        (+ 1 (tv-arg-num v)))))
            (cond ((eq? proc-list *all*) #f)
-                 ((eq? proc-list *none*) (report-failure "Type error detected"))
+                 ((eq? proc-list *none*) (report-failure
+                                           fail (tv-proc-name v) env ids))
                  ((and (list? proc-list) (< k (length proc-list)))
-                  (lookup-proc-variable env (list-ref proc-list k)))
-                 (else (report-failure "Type error detected")))))
+                  (lookup-proc-variable env (list-ref proc-list k) ids fail))
+                 (else (report-failure fail (tv-proc-name v) env ids)))))
         (else (begin (pp v)
-                     (report-failure "Programmer error. I suck.")))))
+                     (error "Bug in lookup-proc-variable" v env)))))
 
 (define (substitute-into-environment environment old new ids)
   (map (lambda (mapping)
@@ -252,63 +253,66 @@
 
 ;; First argument is a pair of environment and current substitutions,
 ;; the second one is a constraint which hasn't yet been substituted into.
-(define (enforce-constraint env-subs constraint_)
-  (let* ((environment (car env-subs))
-	 (prev_subs   (cadr env-subs)) ;;Previously made substitutions on this run
-	 ;; Update the constraint according to our current substitutions
-	 (constraint (multi-substitute-constraint prev_subs constraint_))
-	 (left  (lookup-proc-variable environment (constraint:left constraint)))
-         (right (lookup-proc-variable environment (constraint:right constraint)))
-         (ctype (constraint:relation constraint))
-         (ids   (constraint:ids constraint)))
-    (if (or (not left) (not right) (eqv? left right))
-	;;Two of the same variable, or no info about arg/ret -> do nothing
-	(list environment prev_subs)
-        ;; Otherwise left is a type variable, right is a type var or a type
-        (let* ((tA (lookup-variable environment left))
-               (tB (if (symbol? right)
-                       (lookup-variable environment right)
-                       right))
-               (left-ids (lookup-variable-ids environment left))
-               (right-ids (lookup-variable-ids environment right))
-               (all-ids (union-finite-sets ids left-ids right-ids))
-               (newType (intersect tA tB))
-               (newConstraints
-		(if (or (not (eq? ctype *permits*))
-			(for-all? type:accessors-proc
-				  (lambda (acc) (eq? (acc newType) *none*))))
-		    ;;We are either not dealing with permits, or the permits
-		    ;;requires a check on procedure arguments.
-		    (map
-		     (lambda (l-and-r)
-		       (constraint:make-with-ids
-                         (car l-and-r) ctype (cadr l-and-r) all-ids))
-		     (collect-proc-types tA tB))
-		    '()))
-	       ;;A new substitution
-	       (newSub (if (and (eq? ctype *equals*) (symbol? right))
-			   `((,left ,right ,all-ids))
-			   '()))
-	       ;;Aggregate the new substitution (if any) with exisiting ones
-	       (subs (compose-substitutions prev_subs newSub))
-	       ;;New environment after new substitution and type restriction
-	       (newEnvironment
-		(if (or (eq? ctype *equals*) (eq? ctype *requires*))
-		    (update-variable
-		     (multi-substitute-into-environment environment newSub)
-		     left
-		     newType
-                     all-ids)
-		    environment)))
-          (if (type:empty? newType)
-              (report-failure
-                "There is no possible type for this variable")
-	      ;;Process the newly generated constraints (they won't be
-	      ;; kept for running to convergence, once processed,
-	      ;; these generated constraints are thrown away).
-	      (fold-left enforce-constraint
-			 (list newEnvironment subs)
-			 newConstraints))))))
+(define (enforce-constraint-with-fail-continuation fail)
+  (define (enforce-constraint env-subs constraint_)
+    (let* ((environment (car env-subs))
+           (prev_subs   (cadr env-subs)) ;;Previously made substitutions on this run
+           ;; Update the constraint according to our current substitutions
+           (constraint (multi-substitute-constraint prev_subs constraint_))
+           (ids   (constraint:ids constraint))
+           (left  (lookup-proc-variable
+                    environment (constraint:left constraint) ids fail))
+           (right (lookup-proc-variable
+                    environment (constraint:right constraint) ids fail))
+           (ctype (constraint:relation constraint)))
+      (if (or (not left) (not right) (eqv? left right))
+          ;;Two of the same variable, or no info about arg/ret -> do nothing
+          (list environment prev_subs)
+          ;; Otherwise left is a type variable, right is a type var or a type
+          (let* ((tA (lookup-variable environment left))
+                 (tB (if (symbol? right)
+                         (lookup-variable environment right)
+                         right))
+                 (left-ids (lookup-variable-ids environment left))
+                 (right-ids (lookup-variable-ids environment right))
+                 (all-ids (union-finite-sets ids left-ids right-ids))
+                 (newType (intersect tA tB))
+                 (newConstraints
+                  (if (or (not (eq? ctype *permits*))
+                          (for-all? type:accessors-proc
+                                    (lambda (acc) (eq? (acc newType) *none*))))
+                      ;;We are either not dealing with permits, or the permits
+                      ;;requires a check on procedure arguments.
+                      (map
+                       (lambda (l-and-r)
+                         (constraint:make-with-ids
+                           (car l-and-r) ctype (cadr l-and-r) all-ids))
+                       (collect-proc-types tA tB))
+                      '()))
+                 ;;A new substitution
+                 (newSub (if (and (eq? ctype *equals*) (symbol? right))
+                             `((,left ,right ,all-ids))
+                             '()))
+                 ;;Aggregate the new substitution (if any) with exisiting ones
+                 (subs (compose-substitutions prev_subs newSub))
+                 ;;New environment after new substitution and type restriction
+                 (newEnvironment
+                  (if (or (eq? ctype *equals*) (eq? ctype *requires*))
+                      (update-variable
+                       (multi-substitute-into-environment environment newSub)
+                       left
+                       newType
+                       all-ids)
+                      environment)))
+            (if (type:empty? newType)
+                (report-failure left environment ids fail)
+                ;;Process the newly generated constraints (they won't be
+                ;; kept for running to convergence, once processed,
+                ;; these generated constraints are thrown away).
+                (fold-left enforce-constraint
+                           (list newEnvironment subs)
+                           newConstraints))))))
+  enforce-constraint)
 
 ;TODO: New tests
 #|
@@ -323,7 +327,8 @@
 |#
 
 ;;Enforce constraints until fixed point is reached,
-(define (enforce-all-constraints constraints)
+(define (enforce-all-constraints constraints fail)
+  (define enforce-constraint (enforce-constraint-with-fail-continuation fail))
   (let until-fixation ((constraints constraints)
 		       (environment base-environment))
     (let* ((env-subs (fold-left enforce-constraint
@@ -358,13 +363,19 @@
     3
     "a"))
 
-(let ((p (enforce-all-constraints (car (get-constraints-for prestest-success)))))
-  (map print-constraint (cadr p))
-  (map (lambda (m)
-         (pp (list (car m) (record->list (caadr m)) (cadadr m)))
-         (read))
-       (car p))
-  (map print-constraint (cadr p)))
+(call-with-current-continuation
+  (lambda (k)
+    (let* ((constraints (car (get-constraints-for prestest-fail)))
+           (fail-continuation (lambda (ids)
+                                (for-each print-constraint constraints)
+                                (k ids)))
+           (p (enforce-all-constraints constraints fail-continuation)))
+      (for-each print-constraint (cadr p))
+      (for-each (lambda (m)
+                  (pp (list (car m) (record->list (caadr m)) (cadadr m)))
+                  (read))
+                (car p))
+      (for-each print-constraint (cadr p)))))
 
 (let ((p (enforce-all-constraints
            `(,(constraint:make 'b *equals* type:make-boolean)
