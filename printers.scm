@@ -1,7 +1,9 @@
 ;;; Helpers for printing things in a human-readable format
 
 (define (display-constraint constraint)
-  (display "CONSTRAINT(")
+  (display "CONSTRAINT[")
+  (write (finite-set-elts (constraint:ids constraint)))
+  (display "](")
   (write (constraint:left constraint))
   (display " ")
   (display (constraint:relation constraint))
@@ -21,7 +23,7 @@
 |#
 
 (define (print-type t)
-  (display
+  (write
     (filter (lambda (elt)
               (not (and
                      (list? elt)

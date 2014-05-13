@@ -1,9 +1,32 @@
 (define-record-type constraint
-    (constraint:make left relation right)
+    (constraint:make% left relation right identifiers
+                      usercode left-annotation right-annotation)
     constraint?
-    (left      constraint:left)
-    (relation  constraint:relation)
-    (right     constraint:right))
+    (left              constraint:left)
+    (relation          constraint:relation)
+    (right             constraint:right)
+    (identifiers       constraint:ids     constraint:set-ids!)
+    (usercode          constraint:usercode)
+    (left-annotation   constraint:left-annot)
+    (right-annotation  constraint:right-annot))
+
+(define **constraint-counter** 0)
+
+(define (new-constraint-id)
+  (set! **constraint-counter** (+ **constraint-counter** 1))
+  **constraint-counter**)
+
+(define (constraint:make-with-ids left relation right identifiers
+                         #!optional usercode left-annot right-annot)
+  (constraint:make% left relation right
+                    identifiers
+                    usercode left-annot right-annot))
+
+(define (constraint:make left relation right
+                         #!optional usercode left-annot right-annot)
+  (constraint:make-with-ids left relation right
+                            (finite-set (new-constraint-id))
+                            usercode left-annot right-annot))
 
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
@@ -102,10 +125,19 @@
       *none*
       (cons 'finite-set elts)))
 
+;; in other words,
+(define (finite-set . elts)
+  (make-finite-set% elts))
+
 (define (type:finite-set? ob)
   (and (list? obj)
        (not (null? obj))
        (eqv? (car obj) 'finite-set)))
+
+(define (finite-set-elts fs)
+  (if (eq? fs *none*)
+    '()
+    (cdr fs)))
 
 (define *equals*   'EQUALS)
 (define *requires* 'REQUIRES)
