@@ -2,7 +2,7 @@
 
 ;; A placeholder for type failure. Will probably have additional arguments later.
 (define (report-failure v env ids fail)
-  (fail (union-finite-sets (lookup-variable-ids env v) ids)))
+  (fail v (union-finite-sets (lookup-variable-ids env v) ids)))
 
 ;;Takes two finite sets of the same type
 (define (intersect-two-finite-sets setA setB)
@@ -21,16 +21,6 @@
 
 ;; Requires recursive execution on procedure arguments and return types, if present.
 ;; This method is non-recursive and ignores those - they are handled separately.
-(define (intersect-type type-tag typeA typeB)
-  (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
-        ((eqv? typeA *all*) typeB)
-        ((eqv? typeB *all*) typeA)
-        ((eq? type-tag type:procedure) ;;At this point, we know both are lists
-         (if (not (= (length typeA) (length typeB)))
-             (report-failure
-               "Cannot unify: procedures have different number of arguments")
-             typeA)) ;;Simply return the first one.
-        (else (intersect-finite-sets typeA typeB))))
 
 ;;Collect pairs of type variables from procedure types that have to be
 ;;dealt with.
@@ -47,10 +37,17 @@
 
 ;;Computes the intersection of two types, does not recurse on function
 ;;arguments/return types
-(define (intersect typeA typeB)
+(define (intersect typeA typeB v env ids fail)
+  (define (intersect-type type-tag typeA typeB)
+    (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
+          ((eqv? typeA *all*) typeB)
+          ((eqv? typeB *all*) typeA)
+          ((eq? type-tag type:procedure) ;;At this point, we know both are lists
+           (if (not (= (length typeA) (length typeB)))
+               (report-failure v env ids fail)
+               typeA)) ;;Simply return the first one.
+          (else (intersect-finite-sets typeA typeB))))
   (type:tagged-map intersect-type typeA typeB))
-(define (union typeA typeB)
-  (type:tagged-map union-type typeA typeB))
 
 (define empty-environment '())
 
@@ -276,7 +273,7 @@
                  (left-ids (lookup-variable-ids environment left))
                  (right-ids (lookup-variable-ids environment right))
                  (all-ids (union-finite-sets ids left-ids right-ids))
-                 (newType (intersect tA tB))
+                 (newType (intersect tA tB left environment ids fail))
                  (newConstraints
                   (if (or (not (eq? ctype *permits*))
                           (for-all? type:accessors-proc
@@ -363,19 +360,20 @@
     3
     "a"))
 
+(pp
 (call-with-current-continuation
   (lambda (k)
     (let* ((constraints (car (get-constraints-for prestest-fail)))
-           (fail-continuation (lambda (ids)
+           (fail-continuation (lambda (v ids)
                                 (for-each print-constraint constraints)
-                                (k ids)))
+                                (k (list v ids))))
            (p (enforce-all-constraints constraints fail-continuation)))
       (for-each print-constraint (cadr p))
       (for-each (lambda (m)
                   (pp (list (car m) (record->list (caadr m)) (cadadr m)))
                   (read))
                 (car p))
-      (for-each print-constraint (cadr p)))))
+      (for-each print-constraint (cadr p))))))
 
 (let ((p (enforce-all-constraints
            `(,(constraint:make 'b *equals* type:make-boolean)
