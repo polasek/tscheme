@@ -246,8 +246,13 @@
 ;((a b (finite-set 1)) (c d (finite-set 2)) (e f (finite-set 3)))
 |#
 
-;;Changes: enforce-constraint takes a single constraint and the environment
-;;and returns a list of substitutions.
+;; The type can be a procedure that has type variable bindings
+(define (complex-procedure? type)
+  (list? (type:procedure type)))
+
+(define (type:empty-procedure? type)
+  (and (for-all? type:accessors-proc
+                 (lambda (acc) (eq? (acc type) *none*)))))
 
 ;; First argument is a pair of environment and current substitutions,
 ;; the second one is a constraint which hasn't yet been substituted into.
@@ -276,11 +281,8 @@
                  (all-ids (union-finite-sets ids left-ids right-ids))
                  (newType (intersect tA tB))
                  (newConstraints
-                  (if (or (not (eq? ctype *permits*))
-                          (for-all? type:accessors-proc
-                                    (lambda (acc) (eq? (acc newType) *none*))))
-                      ;;We are either not dealing with permits, or the permits
-                      ;;requires a check on procedure arguments.
+                  (if (type:empty-procedure? newType)
+                      ;;A check on procedure arguments is required.
                       (map
                        (lambda (l-and-r)
                          (constraint:make-with-ids
@@ -288,20 +290,32 @@
                        (collect-proc-types tA tB))
                       '()))
                  ;;A new substitution
-                 (newSub (if (and (eq? ctype *equals*) (symbol? right))
+                 (newSub (if (and (eq? ctype *equals*)
+                                  (symbol? right)
+                                  (or (not (complex-procedure? newType))
+                                      (type:empty-procedure? newType)))
                              `((,left ,right ,all-ids))
                              '()))
                  ;;Aggregate the new substitution (if any) with exisiting ones
                  (subs (compose-substitutions prev_subs newSub))
                  ;;New environment after new substitution and type restriction
-                 (newEnvironment
+                 (newEnv-temp
                   (if (or (eq? ctype *equals*) (eq? ctype *requires*))
                       (update-variable
                        (multi-substitute-into-environment environment newSub)
                        left
                        newType
                        all-ids)
-                      environment)))
+                      environment))
+                 (newEnvironment
+                  (if (and (eq? ctype *equals*)
+                           (symbol? right)
+                           (complex-procedure? newType)
+                           (complex-procedure? tA)
+                           (complex-procedure? tB)
+                           (not (type:empty-procedure? newType)))
+                      (update-variable newEnv-temp right (intersect tB tA) ids)
+                      newEnv-temp)))
             (if (type:empty? newType)
                 (report-failure left environment ids fail)
                 ;;Process the newly generated constraints (they won't be

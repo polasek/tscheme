@@ -55,6 +55,17 @@ but can produce false-positive results.
 \section{Workflow}
 
 %The general workflow, i.e. generating constraints, applying them to a mapping table
+Our program is split into two independent parts.
+First, we have a procedure that takes in code and generates ``type'' constraints.
+These restrict the values that can be taken on by subexpressions of the
+code that is being analysed.
+We generate type variables for both variables and expressions
+and use them to create the right restrictions by using constraints.
+
+Next, we have a procedure that takes a list of constraints and uses them to
+refine the sets of values that a type variable (representing either a subespression
+or a code variable) can take on.
+Moreover, it makes sure that no type variable 
 
 \section{Data structures}
 
