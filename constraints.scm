@@ -37,16 +37,17 @@
 
 ;;Computes the intersection of two types, does not recurse on function
 ;;arguments/return types
-(define (intersect typeA typeB v env ids fail)
-  (define (intersect-type type-tag typeA typeB)
-    (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
+(define (intersect-type type-tag typeA typeB)
+  (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
           ((eqv? typeA *all*) typeB)
           ((eqv? typeB *all*) typeA)
           ((eq? type-tag type:procedure) ;;At this point, we know both are lists
            (if (not (= (length typeA) (length typeB)))
-               (report-failure v env ids fail)
-               typeA)) ;;Simply return the first one.
+               *none*
+               typeA))
           (else (intersect-finite-sets typeA typeB))))
+
+(define (intersect typeA typeB)
   (type:tagged-map intersect-type typeA typeB))
 
 (define empty-environment '())
@@ -273,7 +274,7 @@
                  (left-ids (lookup-variable-ids environment left))
                  (right-ids (lookup-variable-ids environment right))
                  (all-ids (union-finite-sets ids left-ids right-ids))
-                 (newType (intersect tA tB left environment ids fail))
+                 (newType (intersect tA tB))
                  (newConstraints
                   (if (or (not (eq? ctype *permits*))
                           (for-all? type:accessors-proc
