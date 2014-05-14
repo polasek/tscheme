@@ -427,7 +427,9 @@
     ;; generate a dummy constraint (tv requires top).
     (let ((return-tv (fresh-branchvar)))
      (add-constraint
-       (constraint:make-require return-tv type:top))
+       (constraint:make-require return-tv
+                                type:top
+                                expr))
      (tv&cvmap:make return-tv pred-cvmap))))
 
 (defhandler tscheme:process-expr tscheme:process-if if?)
