@@ -7,6 +7,7 @@
 \usepackage{amssymb}
 \usepackage{amsthm}
 \usepackage{listings}
+\usepackage{verbatim}
 \pagestyle{myheadings}
 \markright{}
 
@@ -106,7 +107,48 @@ as if that is the case, the program is guaranteed to fail.
 
 \section{Constraint generation}
 
-%TODO Ben
+\newcommand{\T}[1]{{\tt #1}}
+
+The constraint generation component of Tscheme uses the user's code as a source
+of hints as to what types of each subexpression should be.  If a variable \T{x}
+is used as an operand to \T{+}, we can infer that \T{x} must be a number,
+assuming the program has no bugs.  Other usages of \T{x} later in the code
+(within the same scope) may give additional information; e.g., if we later find
+out that \T{x} is either \T5 or \T{\#t}, we can infer that \T{x} must be \T{5}.
+Thus, as more code is read in, information about existing variables accumulates
+monotonically.  (This of course relies heavily on the assumption that there is
+no mutation.)
+
+\subsection{Constraints are deduced from local information}
+These usage-based hints also have the extremely useful property that the
+rationale for a hint comes from exactly one statement in the code.  This allowed
+us to separate the constraint generation program almost completely from the
+unifier.  Much more importantly, it allowed us to build a {\em conceptually}
+simple specification for the program.  The constraint generator makes one pass
+through the code, accumulating constraints in a database.  After the
+accumulation is complete, its interface with the unifier is simply to hand over
+the database.  Conversely, the unifier's logic has nothing to do with the
+structure of the user's program; it simply makes deductions using the
+constraints it is given.
+
+There was a slight lie in the above paragraph, in that some non-local
+information is used.  To see why, consider a code fragment of the form
+\begin{verbatim}
+(+ x 7)
+\end{verbatim}
+From this we can deduce that \T{x} must be a number; but because the constraints
+concern type variables, the constraint gathering component must know to which
+type variable \T{x} is bound in the current scope.  Type variables have unique
+names, so the unifier does not need to worry about scoping, but the user code
+may have shadowing.  Thus the constraint gatherer essentially must pass through
+the code linearly, keeping track of a scope-aware ``environment'' data structure
+(the current mapping of code variables to type variables).
+
+\subsection{Rules for constraint generation}
+
+
+\subsection{Implementation}
+
 
 \section{Refining types by using constraints}
 
@@ -239,6 +281,11 @@ with different type variables for the same reason as above.
 \section{Discussion and future work}
 
 %TODO Ben - branching, reporting, UI
+% Having the constraint generator keep track of user code variable bindings
+% means that in our current approach, the reasons for these bindings cannot be
+% reported back to the user (at least not without a major overhaul).  It's a
+% consequence of our design choice to separate the two components, and is
+% probably worth it.
 
 %limitations of our approach, what can be done about it
 %directions in which this can be improved, e.g. emacs integration
