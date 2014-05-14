@@ -61,8 +61,8 @@
   (let ((rmake (lambda (left right id)
                  (constraint:make-with-ids
                    left *requires* right (finite-set id)))))
-    (list (rmake 'number type:make-number -1)
-          (rmake 'string type:make-string -2)
+    (list (rmake 'number (type:make-number) -1)
+          (rmake 'string (type:make-string) -2)
           (rmake 'plus   (type:make-procedure 'number '(number number)) -3)
           (rmake 'minus  (type:make-procedure 'number '(number number)) -4)
           (rmake 'string-append
