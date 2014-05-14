@@ -67,6 +67,6 @@
             (display ")")
             (newline)))
           ((constraint? y) (display prefix) (print-constraint y))
-          ((type? y) (display prefix) (print-type y))
+          ((type? y) (display prefix) (print-type y) (newline))
           (else (display prefix) (write-line y))))
   (print-recursive-with-prefix x ""))

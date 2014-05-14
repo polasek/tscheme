@@ -4,13 +4,19 @@
 ;;;
 ;;; Warning: This is boring code!
 ;;;
-;;; Note that we cannot safely reuse the boilerplate abstractions from
-;;; get-constraints.scm, since those assume that the code has already been
-;;; rewritten.  For example, here rw:lambda-body is defined as cddr, but in
-;;; get-constraints lambda-body is defined as caddr, since we assume the bodies
-;;; of lambdas are wrappen in a begin upon rewrite.
+;;; Note that the abstractions here are conceptually distinct from those used
+;;; by get-constraints, because the input language of the rewriter (a subset of
+;;; Scheme) is conceptually distinct from the output language (a smaller subset
+;;; of Scheme).  There are concrete places where this shows up, e.g.,
+;;; rw:lambda-body is cddr, bin in get-constraints lambda-body is caddr, since
+;;; in the output language, all bodies of lambdas are wrapped in a begin.
+;;;
+;;; So, some amount of redundant code here is appropriate, especially if we
+;;; want to allow the author of the rewriter to not always worry that the
+;;; author of get-constraints has changed something.
 
-;;; Helpers for dispatching on the type of code fragment we see
+
+;;; Helpers / abstractions for dispatching on the type of code fragment we see
 
 (define (rw:query-name expr)
   (cadr expr))
@@ -66,6 +72,17 @@
 (define (cond? expr)
   (tagged-list? expr 'cond))
 
+(define (let? expr)
+  (tagged-list? expr 'let))
+
+;; We don't supported named let
+(define (let-bindings expr)
+  (cadr expr))
+
+(define (let-body expr)
+  (cddr expr))
+
+
 ;;; I tried to write my own version of cond->if, but it wasn't as nice as the
 ;;; one in ps04
 (define (rw:cond->if cond-expr)
@@ -91,11 +108,15 @@
                        (expand (cdr clauses))))))
   (expand (clauses cond-expr)))
 
+;;; Generic operation for rewriting pieces of code
 (define rw:rewrite
   (make-generic-operator 1
                          'rw:rewrite
                          (lambda (expr)
                            (rw:rewrite-application expr))))
+
+;;; The handlers for rewriting are very simple.  Usually they do little more
+;;; than recurse into subexpressions.
 
 (define (rw:rewrite-query expr)
   (rw:make-query
@@ -109,6 +130,7 @@
 
 (defhandler rw:rewrite rw:rewrite-self-quoting self-quoting?)
 
+;; Quotes should not get rewritten
 (define (rw:rewrite-quote expr)
   expr)
 
@@ -156,6 +178,19 @@
   (rw:rewrite (rw:cond->if expr)))
 
 (defhandler rw:rewrite rw:rewrite-cond cond?)
+
+(define (rw:rewrite-let expr)
+  (let ((bindings (let-bindings expr))
+        (body (let-body expr)))
+    (rw:make-application
+      (rw:make-lambda
+        (map car bindings)
+        (rw:sequence->begin body))
+      (map (lambda (binding)
+             (rw:rewrite (cadr binding)))
+           bindings))))
+
+(defhandler rw:rewrite rw:rewrite-let let?)
 
 (define (rw:rewrite-application expr)
   (rw:make-application
