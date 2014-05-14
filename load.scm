@@ -2,6 +2,7 @@
 (load "data-structures")
 (load "utils")
 (load "constraints")
+(load "get-constraints-support")
 (load "get-constraints")
 (load "printers")
 (load "rewrite")
