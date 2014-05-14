@@ -19,7 +19,7 @@
         (else record)))
 
 #|
-(pp (record->list (constraint:make-require type:make-string 'b)))
+(pp (record->list (constraint:make-require (type:make-string) 'b)))
 |#
 
 ;; TODO: Make generic

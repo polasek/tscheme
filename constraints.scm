@@ -52,17 +52,7 @@
 
 (define empty-environment '())
 
-;;TODO: Find a better way to identify parts of the base env
-;(define base-environment `((number  (,type:make-number ,(finite-set -1)))
-;                           (string  (,type:make-string ,(finite-set -2)))
-;                           (plus    (,(type:make-procedure 'number '(number number))
-;                                     ,(finite-set -3)))
-;                           (minus   (,(type:make-procedure 'number '(number number))
-;                                     ,(finite-set -4)))
-;                           (string-append (,(type:make-procedure
-;                                              'string '(string string))
-;                                           ,(finite-set -5)))))
-(define base-environment '())
+(define base-environment empty-environment)
 
 (define (lookup-variable environment var)
   (let ((res (assv var environment)))
@@ -332,7 +322,7 @@
 (pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
 (pp (map record->list
          (cadr (enforce-constraint
-                 `(,(constraint:make 'b *equals* type:make-boolean))
+                 `(,(constraint:make 'b *equals* (type:make-boolean)))
                  '()
                  (constraint:make 'a *equals* 'b)))))
 
@@ -392,7 +382,7 @@
       (for-each print-constraint (cadr p))))))
 
 (let ((p (enforce-all-constraints
-           `(,(constraint:make 'b *equals* type:make-boolean)
+           `(,(constraint:make 'b *equals* (type:make-boolean))
              ,(constraint:make 'a *equals* 'b)))))
   (map print-constraint (cadr p))
   (map (lambda (m)
@@ -407,6 +397,6 @@
 (print-recursive (car (get-constraints-for test1)))
 
 (enforce-all-constraints
-                 `(,(constraint:make 'b *equals* type:make-boolean)
+                 `(,(constraint:make 'b *equals* (type:make-boolean))
                    ,(constraint:make 'a *equals* 'b)))
 |#

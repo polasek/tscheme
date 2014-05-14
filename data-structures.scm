@@ -108,7 +108,7 @@
 
 
 #|
-(pp (type:tagged-map list type:top type:make-boolean))
+(pp (type:tagged-map list type:top (type:make-boolean)))
 ;; #[type 21]
 ;; (boolean (boolean all all))
 ;; (number (number all none))
@@ -118,7 +118,7 @@
 ;; (pair (pair all none))
 ;; (procedure (procedure all none))
 
-(map type:boolean (list type:top type:make-boolean))
+(map type:boolean (list type:top (type:make-boolean)))
 |#
 
 (define *none* 'none)
@@ -164,17 +164,17 @@
 
 (define type:empty        (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top          (type:make *all*  *all*  *all*  *all*  *all*  *all*  *all*))
-(define type:make-boolean (type:make *all*  *none* *none* *none* *none* *none* *none*))
-(define type:make-number  (type:make *none* *all*  *none* *none* *none* *none* *none*))
-(define type:make-char    (type:make *none* *none* *all*  *none* *none* *none* *none*))
-(define type:make-string  (type:make *none* *none* *none* *all*  *none* *none* *none*))
-(define type:make-symbol  (type:make *none* *none* *none* *none* *all*  *none* *none*))
-(define type:make-pair    (type:make *none* *none* *none* *none* *none* *all*  *none*))
+(define (type:make-boolean) (type:make *all*  *none* *none* *none* *none* *none* *none*))
+(define (type:make-number)  (type:make *none* *all*  *none* *none* *none* *none* *none*))
+(define (type:make-char)    (type:make *none* *none* *all*  *none* *none* *none* *none*))
+(define (type:make-string)  (type:make *none* *none* *none* *all*  *none* *none* *none*))
+(define (type:make-symbol)  (type:make *none* *none* *none* *none* *all*  *none* *none*))
+(define (type:make-pair)    (type:make *none* *none* *none* *none* *none* *all*  *none*))
 
 (define (type:make-procedure ret-tv arg-tvs)
   (type:make *none* *none* *none* *none* *none* *none* (cons ret-tv arg-tvs)))
 
-(define type:make-any-procedure
+(define (type:make-any-procedure)
   (type:make *none* *none* *none* *none* *none* *none* *all*))
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the

@@ -103,7 +103,7 @@
        ;; In our implementation, the "pair" field of a type cannot be a finite
        ;; set
        (if (pair? contents)
-         type:make-pair
+         (type:make-pair)
          (singleton contents))
        expr))
    (tv&cvmap:make tv cvmap)))
@@ -255,7 +255,7 @@
     ;; Operator must permit procedure
     (add-constraint
       (constraint:make-permit operator-tv
-                              type:make-any-procedure
+                              (type:make-any-procedure)
                               expr))
     ;; The value produced will always be an element of the return type of
     ;; operator
