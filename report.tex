@@ -91,18 +91,55 @@ as if that is the case, the program is guaranteed to fail.
 \section{Types and Constraints}
 \label{sec:types-and-constraints}
 
-%TODO Aaron
-%Constraints and types
+A type in Tscheme represents a universe of possible values a variable can take 
+on.  Each type variable has an associated Tscheme type, which is represented 
+as a record-type with an attribute for each of the Scheme primitive types 
+(boolean number symbol char string pair list procedure) holding the set of 
+possible values of that type the variable could take on.  This set can be
+{\tt *all*}, meaning all values of the type, {\tt *none*}, meaning the 
+variable cannot have the type, or a {\tt finite-set} containing a list of unique
+values of the type that the variable can take on.  This fine-grained level of 
+detail allows us to precisely type functions like {\tt assq}, which can return 
+a list or the value {\tt #f} but not the other boolean value, {\tt #t}.
+The type {\tt *top*} has the value {\tt *all*} for every field.  
 
-%TODO: Request from Jan: please discuss the format of constraints, namely that
-% left is of type extended_type_variable::= type_variable
-%                                         | ret extended_type_variable
-%                                         | arg extended_type_variable n
-% I don't remember the exact order of things, but that's not important. However,
-% I believe we should mention this and I rely on it in section on refining types
-% by using constraints. Thanks!
-% Please also describe the format of procedure types, it is important to note that
-% they contain type variables rather than types directly.
+Type variables that can be procedures are handled slightly differently.  The 
+procedure field can have the values {\tt *all*} or {\tt *none*}, or it can 
+contain a list of type variables (not types), one for its return value and one 
+for each of its fixed number of arguments.  Using type variables for the 
+arguments and return value allows us to concisely represent the potentially 
+recursive nature of procedure types. We use ``extended type variables'', 
+described below, to reference the type variables contained in a procedure type.  
+
+Constraints are also encoded using record types.  A constraint has a left 
+side, a right side, and a relation between the left and right side.  Not all 
+relations are symmetric, so the left and right sides have different 
+interpretations.  The left side is what we call an ``extended type variable'', 
+which can be a type variable or a reference to the return value or a numbered 
+argument of an extended type variable.  Extended type variables allow us to 
+easily make statements about properties of procedures.  The right side can be 
+an extended type variable, or it can be a full Tscheme type.
+
+A constraint represents one of three relations between types (or type 
+variables). The simplest relation is ``equals'', which means the left side and 
+the right side must have exactly the same type.  This is a symmetric relation 
+and allows us to reduce our number of type variables through substitution when 
+the right side is an extended type variable.
+A similar relation is ``requires'', which tells us the left side must be a 
+subset of the right side.  This is not symmetric, and does not add information 
+about the right side, only the left.  Lastly the ``permits'' relation tells us 
+that the variable on the left side is capable of taking on at least one value 
+within the universe of types represented on the right side.  In other words, 
+the intersection of the left and right sides must be nonempty.  ``Permits'' 
+constraints are not useful for refining types, but can tell us when a type 
+variable has no valid types and report a type error.  
+
+The constraint record type also contains
+metadata about the code that generated the constraint, which helps us give 
+useful error reporting when a constraint is violated.  As we refine type 
+variables we track the constraints that were used to make inferences about the 
+type, so that when a user queries a code variable we can give them information 
+about how the type associated with that variable was determined.
 
 \section{Constraint generation}
 
@@ -111,12 +148,12 @@ as if that is the case, the program is guaranteed to fail.
 \section{Refining types by using constraints}
 
 %TODO Jan
-This section discusses how we process the generated constraints,
-namely how do we get as much information as possible about the types of our type variables
-and how do we enforce that every type variable has at least one value it can take on
-along with enforcing that our permits constraints hold.
-We will discuss the high-level implementation, omitting some implementation details and
-technicalities.
+This section discusses how we process the generated constraints, namely how do 
+we get as much information as possible about the types of our type variables 
+and how do we enforce that every type variable has at least one value it can 
+take on along with enforcing that our ``permits'' constraints hold.  We will 
+discuss the high-level implementation, omitting some implementation details 
+and technicalities.
 
 \subsection{Interface specification}
 The procedure gets a list of constraints as an input.
@@ -137,11 +174,12 @@ or it references a return value/argument of a procedure that can be taken on by 
 type variable passed.
 In the latter case, we have to recursively walk the type variable
 mapping to obtain a type variable, if possible.
-Note that this can fail because the referenced type variable cannot be a procedure
+Note that this can fail if the referenced type variable cannot be a procedure
 or can only be a procedure that doesn't have enough arguments, in which
 case a type error is reported.
 It can also fail because the type variable can be a procedure
-but we do not have any more information about it at the moment, i.e. it is \texttt{*any*}.
+but we do not have any more information about it at the moment, i.e. it is 
+\texttt{*any*}.
 In that case, we do not have any way of extracting information from this constraint
 at the given point of computation, therefore it is skipped.
 The right part of a constraint can also take on a type variable or a procedure reference.
