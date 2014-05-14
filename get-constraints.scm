@@ -6,9 +6,56 @@
 (define (tscheme:make-proc-type ret-tv arg-tvs)
   (type:make-procedure ret-tv arg-tvs))
 
+
+;;; TODO move this code to a better place
+
+(define base-constraints
+  (let ((rmake (lambda (left right id)
+                 (constraint:make-with-ids
+                   left *requires* right (finite-set id)))))
+    (list (rmake 'number type:make-number -1)
+          (rmake 'string type:make-string -2)
+          (rmake 'plus   (type:make-procedure 'number '(number number)) -3)
+          (rmake 'minus  (type:make-procedure 'number '(number number)) -4)
+          (rmake 'string-append
+                         (type:make-procedure 'string '(string string)) -5))))
+         
+
+;;; TODO Move this code to a better place
+(define (make-constraint-table)
+  (let ((constraint-table (make-eqv-hash-table)))
+   (for-each (lambda (constraint)
+               (add-constraint-to constraint-table constraint))
+             base-constraints)
+   constraint-table))
+
+(define (fetch-constraint constraint-table id)
+  (define not-found (list 'not-found))
+  
+  (let ((constraint (hash-table/get constraint-table id not-found)))
+   (if (eq? constraint not-found)
+     (error "Reference to unknown constraint" id))
+   constraint))
+
+(define (constraint-table->list constraint-table)
+  (hash-table/datum-list constraint-table))
+
+(define (add-constraint-to constraint-table constraint)
+  (define not-found (list 'not-found))
+
+  (define (insert-into-table key value)
+    (let ((old-entry (hash-table/get constraint-table key not-found)))
+     (if (not (eq? old-entry not-found))
+       (display "Warning: overwriting a constraint\n"))
+     (hash-table/put! constraint-table key value)))
+
+  (for-each (lambda (id)
+              (insert-into-table id constraint))
+            (finite-set-elts (constraint:ids constraint))))
+
 ;;; Setup
 
-(define *the-constraints* '())
+(define *the-constraints* (make-constraint-table))
 
 (define *base-cvmap*
   '((+ plus)
@@ -20,22 +67,55 @@
 
 ;;; This is what we'll use to process pieces of code
 (define (get-constraints-for expr)
-  (fluid-let ((*the-constraints* '())
+  (fluid-let ((*the-constraints* (make-constraint-table))
               (*query-map* (qmap:make))
               (**type-var-counter** 0))
     (tscheme:process-expr expr *base-cvmap*)
     (list *the-constraints* *query-map*)))
 
+;;; Drum roll please
+(define (tscheme:analyze expr)
+  (call-with-current-continuation
+    (lambda (remote-exit)
+      (let* ((constraints&qmap (get-constraints-for expr))
+             (constraint-table (car constraints&qmap))
+             (constraint-list (constraint-table->list constraint-table))
+             (qmap (cadr constraints&qmap)))
+        (define fail-continuation
+          (lambda (tv ids)
+            (remote-exit
+              (list 'failure tv (map (lambda (id)
+                                       (fetch-constraint constraint-table id))
+                                     (finite-set-elts ids))))))
+        
+        (let ((result (enforce-all-constraints constraint-list
+                                               fail-continuation)))
+         (let ((tv->type&reason-ids (car result))
+               (all-constraints (cadr result)))
+           (let ((tv->type&reasons
+                   (map
+                     (lambda (p)
+                       (let ((tv (car p))
+                             (type (caadr p))
+                             (reason-ids (finite-set-elts (cadadr p))))
+                         (list tv
+                               type
+                               (map (lambda (id)
+                                      (fetch-constraint constraint-table id))
+                                    reason-ids))))
+                     tv->type&reason-ids)))
+             (list qmap tv->type&reasons))))))))
+
 ;;; For testing purposes
 (define (capture-constraints thunk)
-  (fluid-let ((*the-constraints* '())
+  (fluid-let ((*the-constraints* (make-constraint-table))
               (*query-map* (qmap:make))
               (**type-var-counter** 0))
     (thunk)
     *the-constraints*))
 
 (define (add-constraint constraint)
-  (set! *the-constraints* (cons constraint *the-constraints*)))
+  (add-constraint-to *the-constraints* constraint))
 
 ;;; Often we will want to pass around two pieces of information: a type
 ;;; variable, and a mapping of code variables to type variables.  Typically, tv
@@ -335,7 +415,7 @@
     ;; Suppress modifications to the-constraints within the extents of the
     ;; consequent and the alternative.  So we only care about side-effects
     ;; here, and only those side-effects that modify the query table.
-    (fluid-let ((*the-constraints* *the-constraints*))
+    (fluid-let ((*the-constraints* (make-constraint-table)))
       (tscheme:process-expr consequent pred-cvmap)
       (tscheme:process-expr alternative pred-cvmap))
 
