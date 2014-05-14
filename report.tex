@@ -49,6 +49,26 @@ but can produce false-positive results.
 
 \section{Assumptions}
 
+Tscheme works on a functional subset of MIT Scheme.  Mutation greatly limits 
+our ability to make inferences about types, as any variable that might be 
+accessible outside the current scope could potentially be changed to any type 
+at almost any time.  Rather than work around this complication we require that
+submitted code be free of side-effects.  We make a few other restrictions on 
+the code.  We do not allow for procedures with variable number of arguments;
+this makes it easier to reason about the types of functions.  We do not, by 
+default, support all Scheme primitive procedures, however each scheme 
+primitive that we handle is explicitly given a type in our code, and more can 
+easily be added as needed.  In a production version of Tscheme we would 
+include all MIT Scheme primitives, but for this early version we include only 
+some of most commonly used primitives for testing purposes.
+
+Our implementation of type analysis is strict in the requirement of not producing 
+false negatives.  To maintain this strictness we do not collect constraints 
+from within the branches of a conditional (we do get constraints from the 
+predicate, however).  Because we cannot determine which branches will be 
+accessible, we assume the return value of an {\texttt if} or {\texttt cond}
+statement is {\texttt *top*}, the set of all possible types.
+
 %Overview of the subset of scheme we handle, what things do not work with our
 %analysis (ifs) and why
 
