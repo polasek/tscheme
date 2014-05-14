@@ -89,17 +89,148 @@ Moreover, it makes sure that no type variable has no value to take on,
 as if that is the case, the program is guaranteed to fail.
 
 \section{Types and Constraints}
+\label{sec:types-and-constraints}
 
 %TODO Aaron
 %Constraints and types
+
+%TODO: Request from Jan: please discuss the format of constraints, namely that
+% left is of type extended_type_variable::= type_variable
+%                                         | ret extended_type_variable
+%                                         | arg extended_type_variable n
+% I don't remember the exact order of things, but that's not important. However,
+% I believe we should mention this and I rely on it in section on refining types
+% by using constraints. Thanks!
+% Please also describe the format of procedure types, it is important to note that
+% they contain type variables rather than types directly.
 
 \section{Constraint generation}
 
 %TODO Ben
 
-\section{Refining types using constraints}
+\section{Refining types by using constraints}
 
 %TODO Jan
+This section discusses how we process the generated constraints,
+namely how do we get as much information as possible about the types of our type variables
+and how do we enforce that every type variable has at least one value it can take on
+along with enforcing that our permits constraints hold.
+We will discuss the high-level implementation, omitting some implementation details and
+technicalities.
+
+\subsection{Interface specification}
+The procedure gets a list of constraints as an input.
+It maintains a map from type variables to types.
+Initially, all type variables are mapped to \texttt{*top*},
+meaning that they can take on any value.
+By processing the constraints, we refine the values the type variables can take on,
+while keeping track of what constraints have restricted the possible values of each
+type variable.
+This information is then used for error reporting and dependency tracking and could be
+further used by the user.
+
+\subsection{Processing a constraint}
+
+As discussed in section \ref{sec:types-and-constraints},
+each constraint contains the left part, which is either a type variable
+or it references a return value/argument of a procedure that can be taken on by the
+type variable passed.
+In the latter case, we have to recursively walk the type variable
+mapping to obtain a type variable, if possible.
+Note that this can fail because the referenced type variable cannot be a procedure
+or can only be a procedure that doesn't have enough arguments, in which
+case a type error is reported.
+It can also fail because the type variable can be a procedure
+but we do not have any more information about it at the moment, i.e. it is \texttt{*any*}.
+In that case, we do not have any way of extracting information from this constraint
+at the given point of computation, therefore it is skipped.
+The right part of a constraint can also take on a type variable or a procedure reference.
+If that is the case, we proceed in the same way.\\
+
+Now we have reduced the problem to the case where we have two type variables,
+or a type variable and a type.
+We obtain the current type for type variables from the mapping,
+and have two types, corresponding to the left and right part of the constraint.
+By the semantics of the three constraints, we perform the following:
+\begin{itemize}
+\item
+In the case of equals, we compute the intersection of the two
+types.
+We change the mapping of both type variables (or one if only one is present)
+to this new type.
+\item
+In the case of requires, we compute the intersection of the two types
+and update the mapping from the left type variable to map to this new type.
+\item
+In the case of a permits, we compute the intersection of the two types and verify
+that it is not empty.
+State of the map does not change in this case, as permits only requires that the
+intersection of the two types is non-empty, i.e. that there is at least one common value.
+\end{itemize}
+
+\subsection{Processing order}
+
+The ordering in which constraints are processed can have an effect on the result.
+For example, if a permits comes before any requires and equals constraints,
+it will always be true, however if it was run last, it might have found
+an empty intersection of types.\\
+
+If all constraints are run repeatedly until the mapping from type variables
+to types converges or an empty type is derived, the order in which constraints are
+processed does not matter anymore.
+This also ensures that all information that can be gained from the constraints
+is obtained and reflected in the refined types, therefore our code repeatedly
+enforces all constraints until convergence is reached.\\
+
+Our algorithm is guaranteed to terminate, as constraints can only contain finite sets
+of specific values or infinite sets of classes of types, such as numbers or strings,
+and the way constraints are generated, there won't be any recursive references between type
+variables.
+As we only have intersection, it is obvious that there is only a finite number of steps
+that can be made before an empty type is derived.
+
+\subsection{Computing intersection}
+
+Computing an intersection of two types $tA$ and $tB$ is trivial for the most part.
+The only tricky case occurs when we are intersecting two types that could take on a procedure
+value, where both of them have a specified list of type variables that represent the
+procedure's arguments and return types.
+If these two types are not pairwise equal, we might need to enforce the given constraint on the
+respective pairs of type variables.
+However, we do this if and only if the intersection of types of $tA$ and $tB$ is otherwise empty.\\
+
+It is trivial to see why this is necessary if the intersection of the types is otherwise empty,
+as we do need to know whether the types all give non-empty intersections or not.
+To see why we cannot do it in any case, consider for example a requires constraint.
+Say that $tA$ can be either a number or a thunk that returns a string,
+and $tB$ can be either a number or a thunk that returns a number.
+Clearly, the intersection of the two types is a number.
+However, if we proceeded with enforcing the constraint on the procedures,
+we would derive a contradiction, although it is possible that the set of constraints
+we were given does not necessarily derive an empty type.\\
+
+The reason the procedure types behave differently than other type classes is that
+they are represented with type variables rather than pure types.
+This allows for a nice flat representation and type variable sharing,
+however introduces some complexity as described above.
+
+\subsection{Substitution}
+
+When an equals constraint that boils down to setting equality between two different
+type variables, we compute the intersection of the types, set the mapping from the
+left type variable to the new type in our mapping.
+Rather than doing the same for the second type variable, we substitute the left type
+variable for the right.
+The substitutions have to be done everywhere, that is both in mapping and in all constraints.
+The advantage of doing this is that it essentially removes the current constraint
+or makes it trivial, and all constraint referencing one of the type variables will
+now affect both.
+Making these substitutions thus speeds up convergence, as the number of constraints
+is effectively reduced by doing so.\\
+
+Note that substitution can only be done in the case the procedure types
+of the two types being mapped from the type variables are not both procedure specifications
+with different type variables for the same reason as above.
 
 \section{Development process}
 
