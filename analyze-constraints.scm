@@ -46,17 +46,18 @@
 ;;; Substitutions: See analyze-constraints-support.scm for related definitions.
 
 (define (substitute-into-environment environment sub)
-  (map (lambda (mapping)
-         (let* ((m-type (env-mapping:type mapping))
-                (new-type (substitute-into-type
-                            m-type (sub:old sub) (sub:new sub)))
-                (m-ids (env-mapping:ids mapping))
-                ;; Update ids iff a substitution was made
-                (new-ids (if (tscheme:equal? new-type m-type)
-                             m-ids
-                             (union-finite-sets (sub:ids sub) m-ids))))
-           (list (car mapping) (list new-type new-ids))))
-       environment))
+  (if (not (substitution? sub)) environment
+    (map (lambda (mapping)
+           (let* ((m-type (env-mapping:type mapping))
+                  (new-type (substitute-into-type
+                              m-type (sub:old sub) (sub:new sub)))
+                  (m-ids (env-mapping:ids mapping))
+                  ;; Update ids iff a substitution was made
+                  (new-ids (if (tscheme:equal? new-type m-type)
+                               m-ids
+                               (union-finite-sets (sub:ids sub) m-ids))))
+             (list (car mapping) (list new-type new-ids))))
+         environment)))
 
 (define (substitute-into-type type old new)
   (type:tagged-map (lambda (tag t)
@@ -69,37 +70,38 @@
                    type))
 
 (define (substitute-constraint constraint sub)
-  (let* ((old (sub:old sub))
-         (new (sub:new sub))
-         (ids (sub:ids sub))
-         (left        (constraint:left        constraint))
-	 (ctype       (constraint:relation    constraint))
-         (right       (constraint:right       constraint))
-         (usercode    (constraint:usercode    constraint))
-         (left-annot  (constraint:left-annot  constraint))
-         (right-annot (constraint:right-annot constraint))
-         (new-ids     (union-finite-sets (constraint:ids constraint) ids)))
-    (cond ((equal? left old)
-	   (constraint:make-with-ids
-             new ctype right new-ids usercode left-annot right-annot))
-	  ((and (tv-ret? left) (equal? (tv-proc-name left) old))
-	   (constraint:make-with-ids
-             (return-type new) ctype right new-ids usercode left-annot right-annot))
-	  ((and (tv-arg? left) (equal? (tv-proc-name left) old))
-	   (constraint:make-with-ids
-             (arg-of new (tv-arg-num left)) ctype right
-             new-ids usercode left-annot right-annot))
-	  ((equal? right old)
-	   (constraint:make-with-ids
-             left ctype new new-ids usercode left-annot right-annot))
-	  ((and (tv-ret? right) (equal? (tv-proc-name right) old))
-	   (constraint:make-with-ids
-             left ctype (return-type new) new-ids usercode left-annot right-annot))
-	  ((and (tv-arg? right) (equal? (tv-proc-name right) old))
-	   (constraint:make-with-ids
-             left ctype (arg-of new (tv-arg-num left))
-             new-ids usercode left-annot right-annot))
-	  (else constraint))))
+  (if (not (substitution? sub)) constraint
+    (let* ((old (sub:old sub))
+           (new (sub:new sub))
+           (ids (sub:ids sub))
+           (left        (constraint:left        constraint))
+           (ctype       (constraint:relation    constraint))
+           (right       (constraint:right       constraint))
+           (usercode    (constraint:usercode    constraint))
+           (left-annot  (constraint:left-annot  constraint))
+           (right-annot (constraint:right-annot constraint))
+           (new-ids     (union-finite-sets (constraint:ids constraint) ids)))
+      (cond ((equal? left old)
+             (constraint:make-with-ids
+               new ctype right new-ids usercode left-annot right-annot))
+            ((and (tv-ret? left) (equal? (tv-proc-name left) old))
+             (constraint:make-with-ids
+               (return-type new) ctype right new-ids usercode left-annot right-annot))
+            ((and (tv-arg? left) (equal? (tv-proc-name left) old))
+             (constraint:make-with-ids
+               (arg-of new (tv-arg-num left)) ctype right
+               new-ids usercode left-annot right-annot))
+            ((equal? right old)
+             (constraint:make-with-ids
+               left ctype new new-ids usercode left-annot right-annot))
+            ((and (tv-ret? right) (equal? (tv-proc-name right) old))
+             (constraint:make-with-ids
+               left ctype (return-type new) new-ids usercode left-annot right-annot))
+            ((and (tv-arg? right) (equal? (tv-proc-name right) old))
+             (constraint:make-with-ids
+               left ctype (arg-of new (tv-arg-num left))
+               new-ids usercode left-annot right-annot))
+            (else constraint)))))
 
 (define (multi-substitute-constraint constraint subs)
   (fold-left substitute-constraint constraint subs))
@@ -172,7 +174,7 @@
                  (newEnv-temp
                   (if (or (eq? ctype *equals*) (eq? ctype *requires*))
                       (update-variable
-                       (multi-substitute-into-environment environment newSub)
+                       (substitute-into-environment environment newSub)
                        left
                        newType
                        all-ids)
