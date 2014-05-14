@@ -64,10 +64,10 @@ some of most commonly used primitives for testing purposes.
 
 Our implementation of type analysis is strict in the requirement of not producing 
 false negatives.  To maintain this strictness we do not collect constraints 
-from within the branches of a conditional (we do get constraints from the
-predicate, however).  Because we cannot determine which branches will be
-accessible, we assume the return value of an {\tt if} or {\tt cond} statement is
-{\tt *top*}, the set of all possible types.
+from within the branches of a conditional (we do get constraints from the 
+predicate, however).  Because we cannot determine which branches will be 
+accessible, we assume the return value of an {\texttt if} or {\texttt cond}
+statement is {\texttt *top*}, the set of all possible types.
 
 %Overview of the subset of scheme we handle, what things do not work with our
 %analysis (ifs) and why
@@ -90,17 +90,24 @@ as if that is the case, the program is guaranteed to fail.
 
 \section{Types and Constraints}
 
+%TODO Aaron
 %Constraints and types
 
 \section{Constraint generation}
 
+%TODO Ben
+
 \section{Refining types using constraints}
+
+%TODO Jan
 
 \section{Development process}
 
 %work division, description of the general process
 
 \section{Discussion and future work}
+
+%TODO Ben - branching, reporting, UI
 
 %limitations of our approach, what can be done about it
 %directions in which this can be improved, e.g. emacs integration
