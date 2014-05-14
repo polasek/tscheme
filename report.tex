@@ -1,0 +1,107 @@
+\documentclass[a4paper]{article}
+%\usepackage{fullpage}
+\usepackage[bottom=1in, left=1in, top=1in, right=2in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{listings}
+\pagestyle{myheadings}
+\markright{}
+
+\begin{document}
+\title{6.945 Final Project\\
+Tscheme: Using type inference to automatically complain about the programmer's code}
+\date{\today}
+\author{Aaron Graham-Horowitz, Ben Zinberg, Jan Polášek}
+\maketitle
+
+\newpage
+
+\section{Introduction}
+
+Tscheme is a static code analyser over a subset of MIT Scheme
+that aims to reduce the number of bugs in user's code.
+It uses static type analysis to derive supersets of values that can be taken on by
+(sub)expressions.
+If an empty set is derived, a type error is bound to happen and the error is reported.
+If the derived set of values is non-empty, the user is allowed to query the sets of
+values expressions can take on to get more information about the code they have written.
+
+There are two common ways of doing static analysis.
+One approach is static typing, which imposes type rules which are
+over-approximations of what can happen in correct programs.
+A good static typing scheme will provide some sort of type safety -
+guarantees that will be enforced and that the programmer can rely on.
+It is for example possible to statically determine that an integer ``plus''
+operator will never be called with a string passed as an argument.
+The disadvantage of any reasonable type system over a sufficiently powerful language
+is that there will always be valid programs that do not violate the notion of
+type safety guaranteed by the type system that nevertheless will not type check.
+In other words, the type checker will never produce false-positives,
+but can produce false-negatives.
+As we wanted to have a static analyser that works on an existing Scheme
+language (or a subset of), we decided to go in the other direction,
+which is a code analyser.
+Unlike a type checker, a code analyser will never produce false-negatives,
+but can produce false-positive results.
+
+\section{Assumptions}
+
+Tscheme works on a functional subset of MIT Scheme.  Mutation greatly limits 
+our ability to make inferences about types, as any variable that might be 
+accessible outside the current scope could potentially be changed to any type 
+at almost any time.  Rather than work around this complication we require that
+submitted code be free of side-effects.  We make a few other restrictions on 
+the code.  We do not allow for procedures with variable number of arguments;
+this makes it easier to reason about the types of functions.  We do not, by 
+default, support all Scheme primitive procedures, however each scheme 
+primitive that we handle is explicitly given a type in our code, and more can 
+easily be added as needed.  In a production version of Tscheme we would 
+include all MIT Scheme primitives, but for this early version we include only 
+some of most commonly used primitives for testing purposes.
+
+Our implementation of type analysis is strict in the requirement of not producing 
+false negatives.  To maintain this strictness we do not collect constraints 
+from within the branches of a conditional (we do get constraints from the 
+predicate, however).  Because we cannot determine which branches will be 
+accessible, we assume the return value of an {\texttt if} or {\texttt cond}
+statement is {\texttt *top*}, the set of all possible types.
+
+%Overview of the subset of scheme we handle, what things do not work with our
+%analysis (ifs) and why
+
+\section{Workflow}
+
+%The general workflow, i.e. generating constraints, applying them to a mapping table
+Our program is split into two independent parts.
+First, we have a procedure that takes in code and generates ``type'' constraints.
+These restrict the values that can be taken on by subexpressions of the
+code that is being analysed.
+We generate type variables for both variables and expressions
+and use them to create the right restrictions by using constraints.
+
+Next, we have a procedure that takes a list of constraints and uses them to
+refine the sets of values that a type variable (representing either a subespression
+or a code variable) can take on.
+Moreover, it makes sure that no type variable 
+
+\section{Data structures}
+
+%Constraints and types
+
+\section{Constraint generation}
+
+\section{Refining types using constraints}
+
+\section{Development process}
+
+%work division, description of the general process
+
+\section{Discussion and future work}
+
+%limitations of our approach, what can be done about it
+%directions in which this can be improved, e.g. emacs integration
+
+\end{document}
