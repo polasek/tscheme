@@ -1,39 +1,74 @@
-;;; Description of the extra fields:
-;;; * identifiers: a finite-set of numbers that serve as names for the
-;;; constraint
-;;; * usercode: the code that produced this constraint
-;;; * left-annotation: snippet of user code (or some human-readable
-;;; abbreviation thereof) representing left
-;;; * right-annotation: same as left-annotation, but for right
-(define-record-type constraint
-    (constraint:make% left relation right identifiers
-                      usercode left-annotation right-annotation)
-    constraint?
-    (left              constraint:left)
-    (relation          constraint:relation)
-    (right             constraint:right)
-    (identifiers       constraint:ids     constraint:set-ids!)
-    (usercode          constraint:usercode)
-    (left-annotation   constraint:left-annot)
-    (right-annotation  constraint:right-annot))
+;;;; Data structures, abstractions, and support code for working with types.
 
-(define **constraint-counter** 0)
+;;; Type variables
 
-(define (new-constraint-id)
-  (set! **constraint-counter** (+ **constraint-counter** 1))
-  **constraint-counter**)
+(define **type-var-counter** 0)
+(define (fresh #!optional prefix)
+  (set! **type-var-counter** (+ **type-var-counter** 1))
+  (symbol-append (if (equal? prefix #!default) 'x prefix)
+                 **type-var-counter**))
 
-(define (constraint:make-with-ids left relation right identifiers
-                         #!optional usercode left-annot right-annot)
-  (constraint:make% left relation right
-                    identifiers
-                    usercode left-annot right-annot))
+(define (fresh-argvar) (fresh 'argvar))
+(define (fresh-retvar) (fresh 'retvar))
+(define (fresh-procvar) (fresh 'proc))
+(define (fresh-branchvar) (fresh 'branch))
 
-(define (constraint:make left relation right
-                         #!optional usercode left-annot right-annot)
-  (constraint:make-with-ids left relation right
-                            (finite-set (new-constraint-id))
-                            usercode left-annot right-annot))
+;;; Abstractions for dealing with ret and arg references
+(define (return-type tv)
+  (list 'ret tv))
+
+(define (arg-of tv num)
+  (list 'arg tv num))
+
+(define (tv-ret? v) (and (pair? v) (eqv? (car v) 'ret)))
+(define (tv-arg? v) (and (pair? v) (eqv? (car v) 'arg)))
+(define (tv-proc-name v) (cadr v))
+(define (tv-arg-num v) (caddr v))
+
+(define (proc:get-ret proc) (car proc))
+(define (proc:get-arg proc n) (list-ref proc (+ n 1)))
+
+
+;;; Finite sets
+
+(define (make-finite-set% elts)
+  (if (null? elts)
+      *none*
+      (cons 'finite-set elts)))
+
+;; in other words,
+(define (finite-set . elts)
+  (make-finite-set% elts))
+
+(define (type:finite-set? obj)
+  (and (list? obj)
+       (not (null? obj))
+       (eqv? (car obj) 'finite-set)))
+
+(define (finite-set-elts fs)
+  (if (eq? fs *none*)
+    '()
+    (cdr fs)))
+
+;; Set operations on finite sets
+(define (intersect-two-finite-sets setA setB)
+  (make-finite-set%
+    (general-sort (filter (lambda (e) (memv e (finite-set-elts setB)))
+                          (finite-set-elts setA)))))
+
+(define (union-two-finite-sets setA setB)
+  (make-finite-set%
+    (dedup (general-sort (append (finite-set-elts setA)
+                                 (finite-set-elts setB))))))
+
+(define (intersect-finite-sets . sets)
+  (reduce-left intersect-two-finite-sets #f (filter type:finite-set? sets)))
+
+(define (union-finite-sets . sets)
+  (reduce-left union-two-finite-sets #f (filter type:finite-set? sets)))
+
+
+;;; Types
 
 (define-record-type type
   (type:make boolean number char string symbol pair procedure)
@@ -121,46 +156,13 @@
 (map type:boolean (list type:top (type:make-boolean)))
 |#
 
+;;; More specific instances, including constructors for finite-sets
+
 (define *none* 'none)
 (define *all*  'all)
 
 (define (type:none? obj) (eqv? obj *none*))
 (define (type:all?  obj) (eqv? obj *all*))
-
-(define (make-finite-set% elts)
-  (if (null? elts)
-      *none*
-      (cons 'finite-set elts)))
-
-;; in other words,
-(define (finite-set . elts)
-  (make-finite-set% elts))
-
-(define (type:finite-set? obj)
-  (and (list? obj)
-       (not (null? obj))
-       (eqv? (car obj) 'finite-set)))
-
-(define (finite-set-elts fs)
-  (if (eq? fs *none*)
-    '()
-    (cdr fs)))
-
-(define *equals*   'EQUALS)
-(define *requires* 'REQUIRES)
-(define *permits*  'PERMITS)
-
-(define (equality? constraint)
-  (and (constraint? constraint)
-       (eqv? (constraint:relation constraint) *equals*)))
-
-(define (requirement? constraint)
-  (and (constraint? constraint)
-       (eqv? (constraint:relation constraint) *requires*)))
-
-(define (permission? constraint)
-  (and (constraint? constraint)
-       (eqv? (constraint:relation constraint) *permits*)))
 
 (define type:empty        (type:make *none* *none* *none* *none* *none* *none* *none*))
 (define type:top          (type:make *all*  *all*  *all*  *all*  *all*  *all*  *all*))
@@ -176,6 +178,14 @@
 
 (define (type:make-any-procedure)
   (type:make *none* *none* *none* *none* *none* *none* *all*))
+
+;; The type can be a procedure that has type variable bindings
+(define (complex-procedure? type)
+  (list? (type:procedure type)))
+
+(define (type:empty-procedure? type)
+  (and (for-all? type:accessors-proc
+                 (lambda (acc) (eq? (acc type) *none*)))))
 
 ;;Creates a new type with elts (not necessarily of the same type) as finite-sets in the
 ;;appropriate fields of the type record
@@ -195,6 +205,8 @@
               (make-finite-set%
                (dedup (general-sort (list-transform-positive elts type-pred)))))
             type:predicates))))
+
+;; TODO: Check this
 #|
 (pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
 (pp (type:finite-set "a b"))
@@ -208,46 +220,37 @@
 ;; (procedure none)
 |#
 
-;;; Fresh type variables
-(define **type-var-counter** 0)
-(define (fresh #!optional prefix)
-  (set! **type-var-counter** (+ **type-var-counter** 1))
-  (symbol-append (if (equal? prefix #!default) 'x prefix)
-                 **type-var-counter**))
 
-(define (fresh-argvar) (fresh 'argvar))
-(define (fresh-retvar) (fresh 'retvar))
-(define (fresh-procvar) (fresh 'proc))
-(define (fresh-branchvar) (fresh 'branch))
+;;; Intersecting types
 
-(define (constraint:make-equal left right
-                               #!optional usercode left-annot right-annot)
-  (constraint:make left *equals* right
-                   usercode left-annot right-annot))
+;;; Requires recursive execution on procedure arguments and return types, if present.
+;;; This method is non-recursive and ignores those - they are handled separately.
 
-(define (constraint:make-require left right
-                               #!optional usercode left-annot right-annot)
-  (constraint:make left *requires* right
-                   usercode left-annot right-annot))
+;; Collect pairs of type variables from procedure types that have to be
+;; dealt with.
+(define (collect-proc-types typeA typeB)
+  (let* ((pA (type:procedure typeA))
+         (pB (type:procedure typeB)))
+    (if (and (list? pA) (list? pB))
+        (list-transform-positive
+          (map (lambda (tvarA tvarB)
+                 (if (eqv? tvarA tvarB) #t (list tvarA tvarB)))
+               pA pB)
+          symbol?)
+        '())))
 
-(define (constraint:make-permit left right
-                               #!optional usercode left-annot right-annot)
-  (constraint:make left *permits* right
-                   usercode left-annot right-annot))
+;; Computes the intersection of two types, does not recurse on function
+;; arguments/return types
+(define (intersect-type type-tag typeA typeB)
+  (cond ((or (eqv? typeA *none*) (eqv? typeB *none*)) *none*)
+          ((eqv? typeA *all*) typeB)
+          ((eqv? typeB *all*) typeA)
+          ((eq? type-tag type:procedure) ;;At this point, we know both are lists
+           (if (not (= (length typeA) (length typeB)))
+               *none*
+               typeA))
+          (else (intersect-finite-sets typeA typeB))))
 
-
-;;; Abstractions for dealing with ret and arg references
-(define (return-type tv)
-  (list 'ret tv))
-
-(define (arg-of tv num)
-  (list 'arg tv num))
-
-(define (tv-ret? v) (and (pair? v) (eqv? (car v) 'ret)))
-(define (tv-arg? v) (and (pair? v) (eqv? (car v) 'arg)))
-(define (tv-proc-name v) (cadr v))
-(define (tv-arg-num v) (caddr v))
-
-(define (proc:get-ret proc) (car proc))
-(define (proc:get-arg proc n) (list-ref proc (+ n 1)))
+(define (intersect typeA typeB)
+  (type:tagged-map intersect-type typeA typeB))
 
