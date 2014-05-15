@@ -92,6 +92,11 @@ as if that is the case, the program is guaranteed to fail.
 \section{Types and Constraints}
 \label{sec:types-and-constraints}
 
+Before elaborating further on our process, we refine our notion of types and 
+constraints.  
+
+\subsection{Types}
+
 A type in Tscheme represents a universe of possible values a variable can take 
 on.  Each type variable has an associated Tscheme type, which is represented 
 as a record-type with an attribute for each of the Scheme primitive types 
@@ -111,6 +116,8 @@ for each of its fixed number of arguments.  Using type variables for the
 arguments and return value allows us to concisely represent the potentially 
 recursive nature of procedure types. We use ``extended type variables'', 
 described below, to reference the type variables contained in a procedure type.  
+
+\subsection{Constraints}
 
 Constraints are also encoded using record types.  A constraint has a left 
 side, a right side, and a relation between the left and right side.  Not all 
