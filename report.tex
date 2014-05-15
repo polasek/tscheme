@@ -458,4 +458,16 @@ quite useful, more sophisticated reporting would be desirable:
 %limitations of our approach, what can be done about it
 %directions in which this can be improved, e.g. emacs integration
 
+Further work on this project could include a more user-friendly interface.  
+Because we track the locations in user code of the constraints that generated
+an error, it would be possible in principle to print out the code with problem 
+areas clearly highlighted.  An appealing approach would be to integrate 
+Tscheme with emacs, with a macro allowing users to run a section of code 
+through Tscheme's analyzer and then use the results to highlight the code in 
+place.  Emacs integration could also allow the user to select variables to 
+query using emacs markers, rather than writing ``query'' into the code.
+Conveniences such as these would be an important part of transitioning Tscheme 
+as an academic project to more consumer-oriented software.  
+
+
 \end{document}
