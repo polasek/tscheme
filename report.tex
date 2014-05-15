@@ -28,18 +28,18 @@ Our code can be found on GitHub at \T{https://github.com/polasek/tscheme}.
 
 \section{Introduction}
 
-Tscheme is a static code analyser over a subset of MIT Scheme
-that aims to reduce the number of bugs in user's code.
-It uses static type analysis to derive supersets of values that can be taken on by
-(sub)expressions.
-If an empty set is derived, a type error is bound to happen and the error is reported.
-If the derived set of values is non-empty, the user is allowed to query the sets of
-values expressions can take on to get more information about the code they have written.
+Tscheme is a static code analyser over a subset of MIT Scheme that aims to
+reduce the number of bugs in user's code.  It uses static type analysis to
+derive, for each subexpression, a superset of the values that can be taken on by
+that subexpression.
+If an empty set is derived, a type error is bound to happen and the error is
+reported.  If all derived supersets are non-empty, the user is allowed to query
+these supersets to get more information about the code they have written.
 
 There are two common ways of doing static analysis.
 One approach is static typing, which imposes type rules which are
 over-approximations of what can happen in correct programs.
-A good static typing scheme will provide some sort of type safety -
+A good static typing system will provide some sort of type safety -
 guarantees that will be enforced and that the programmer can rely on.
 It is for example possible to statically determine that an integer ``plus''
 operator will never be called with a string passed as an argument.
@@ -47,9 +47,10 @@ The disadvantage of any reasonable type system over a sufficiently powerful lang
 is that there will always be valid programs that do not violate the notion of
 type safety guaranteed by the type system that nevertheless will not type check.
 In other words, the type checker will never produce false-positives,
-but can produce false-negatives.
+but can produce false-negatives (where a ``false negative'' means that the type
+checker disapproves of a correct program).
 As we wanted to have a static analyser that works on an existing Scheme
-language (or a subset of), we decided to go in the other direction,
+language (or a subset thereof), we decided to go in the other direction,
 which is a code analyser.
 Unlike a type checker, a code analyser will never produce false-negatives,
 but can produce false-positive results.
@@ -66,15 +67,15 @@ this makes it easier to reason about the types of functions.  We do not, by
 default, support all Scheme primitive procedures, however each scheme 
 primitive that we handle is explicitly given a type in our code, and more can 
 easily be added as needed.  In a production version of Tscheme we would 
-include all MIT Scheme primitives, but for this early version we include only 
-some of most commonly used primitives for testing purposes.
+include all fixed-arity MIT Scheme primitives, but for this early version we include only 
+some common primitives for testing purposes.
 
 Our implementation of type analysis is strict in the requirement of not producing 
 false negatives.  To maintain this strictness we do not collect constraints 
 from within the branches of a conditional (we do get constraints from the 
 predicate, however).  Because we cannot determine which branches will be 
 accessible, we assume the return value of an {\tt if} or {\tt cond}
-statement is {\tt *top*}, the set of all possible types.
+statement is {\tt *top*}, the type consisting of all possible values.
 
 %Overview of the subset of scheme we handle, what things do not work with our
 %analysis (ifs) and why
@@ -83,17 +84,18 @@ statement is {\tt *top*}, the set of all possible types.
 
 %The general workflow, i.e. generating constraints, applying them to a mapping table
 Our program is split into two independent parts.
-First, we have a procedure that takes in code and generates ``type'' constraints.
+First, we have a procedure that takes in code and generates type constraints.
 These restrict the values that can be taken on by subexpressions of the
 code that is being analysed.
-We generate type variables for both variables and expressions
+We generate type variables for both variables and expressions in the code
 and use them to create the right restrictions by using constraints.
 
 Next, we have a procedure that takes a list of constraints and uses them to
 refine the sets of values that a type variable representing either a subexpression
 or a code variable can take on.
 Moreover, it makes sure that no type variable has no value to take on,
-as if that is the case, the program is guaranteed to fail.
+as if that is the case, the program is guaranteed to fail (or perhaps, that
+some procedure within the program can never be called).
 
 \section{Types and Constraints}
 \label{sec:types-and-constraints}
@@ -143,7 +145,7 @@ A similar relation is ``requires'', which tells us the left side must be a
 subset of the right side.  This is not symmetric, and does not add information 
 about the right side, only the left.  Lastly the ``permits'' relation tells us 
 that the variable on the left side is capable of taking on at least one value 
-within the universe of types represented on the right side.  In other words, 
+within type represented on the right side.  In other words, 
 the intersection of the left and right sides must be nonempty.  ``Permits'' 
 constraints are not useful for refining types, but can tell us when a type 
 variable has no valid types and report a type error.  
@@ -157,7 +159,7 @@ about how the type associated with that variable was determined.
 
 \section{Constraint generation}
 The constraint generation component of Tscheme uses the user's code as a source
-of hints as to what types of each subexpression should be.  If a variable \T{x}
+of hints as to what the type of each subexpression should be.  If a variable \T{x}
 is used as an operand to \T{+}, we can infer that \T{x} must be a number,
 assuming the program has no bugs.  Other usages of \T{x} later in the code
 (within the same scope) may give additional information; e.g., if we later find
@@ -195,9 +197,10 @@ operation, \T{tscheme:process-expr}, takes in an expression and the current
 mapping of code variables to type variables.  It then ``processes'' the
 expression: it adds any deduced constraints to a global constraint table, and
 outputs two things: a type variable representing the value produced by the
-expression, and an updated mapping of code variables to type variables.  The
-logic as to which constraints are deduced is covered in section
-\ref{sec:constraint-generation-rules}.
+expression, and an updated mapping of code variables to type variables.
+Naturally, many of the handlers for \T{tscheme:process-expr} make recursive
+calls to \T{tscheme:process-expr}.  The logic as to which constraints are
+deduced is covered in section \ref{sec:constraint-generation-rules}.
 
 It turns out that the most deceptively complicated aspect of constraint
 generation is keeping track of the mapping of code variables to type variables.
@@ -227,6 +230,12 @@ quite easy to explain.
 
 \newcommand{\lra}{\longrightarrow}
 \begin{itemize}
+  \item An expression of the form \T{(query qname expr)} (which is not itself
+    valid Scheme) represents a query.  It behaves exactly like the expression
+    \T{expr}, except that the type variable bound to the output value is
+    recorded in a global query table, and can be looked up by the name \T{qname}
+    afterwards.
+
   \item A quoted expression or a self-quoting expression (number, string,
     character, boolean) is bound to a fresh type variable.  An ``equals''
     constraint is generated saying that the new type variable's type is a
@@ -259,8 +268,10 @@ quite easy to explain.
     must be a subtype of the return type of the last expression within the body.
     Note that, since the body of a \T{lambda} has its own lexical scope, the
     \T{cvmap} returned after processing a \T{lambda} should be the one we had
-    {\em before} entering the body.  This way, shadowing is correctly handled:
-    a separate type variable is created for each scope in which a name appears.
+    {\em before} entering the body (except that the accumulated waiting markers
+    are remembered---see \T{cvmap.scm}).  This way, shadowing is correctly
+    handled: a separate type variable is created for each scope in which a name
+    appears.
 
   \item For reasons which we discussed above and will continue to discuss below,
     \T{if} expressions are handled very conservatively.  We allocate a fresh
@@ -276,31 +287,31 @@ quite easy to explain.
     \[ \T{(operator }\mathtt{arg_1\ \ldots\ arg_n}\T{)}, \]
     are the most complex part of constraint generation (in concept, but not in
     code).  The actual value of $\mathtt{arg_i}$ must lie within the set of
-    permissible values of the \T{i}th argument of \T{operator}, but this can mean
-    different things depending on the syntacting form of $\mathtt{arg_i}$ (which
-    is itself a subexpression).  If $\mathtt{arg_i}$ is the subexpression \T{(f
-    1 2)}, then the return type of \T{f} had better contain at least one value
-    which is permissible as the $i$th operand to \T{operator}; thus we get the
-    constraint
+    permissible values of the \T{i}th argument of \T{operator}, but this can
+    mean different things depending on the syntactic form of $\mathtt{arg_i}$
+    (which is itself a subexpression).  If $\mathtt{arg_i}$ is the subexpression
+    \T{(f 1 2)}, then the return type of \T{f} had better contain at least one
+    value which is permissible as the $i$th operand to \T{operator}; thus we get
+    the constraint
     \[ \T{(arg operator i) PERMITS (ret f)}. \]
     However, if $\mathtt{arg_i}$ is a variable \T{x}, then every possible value
     of \T{x} must be permissible as the \T{i}th operand to \T{operator}; thus we
     get the constraint
     \[ \T{x REQUIRES (arg operator i)}. \]
-    It turns out to be sensible to generate \T{REQUIRE} constraints for operands
-    which are variables, and \T{PERMITS} constraints for all other operands.
-    This is a very conservative strategy, but it would take considerable
-    redesign (or a tolerance for false positives) to open the door for more
-    aggressive behavior.
+    It turns out to be sensible to generate \T{REQUIRES} constraints for
+    operands which are variables, and \T{PERMITS} constraints for all other
+    operands.  This is a very conservative strategy, but it would take
+    considerable redesign (or a tolerance for false negatives) to open the door
+    for more aggressive behavior.
 \end{itemize}
 
 
 \section{Refining types by using constraints}
 
 %TODO Jan
-This section discusses how we process the generated constraints, namely how do 
+This section discusses how we process the generated constraints, i.e., how
 we get as much information as possible about the types of our type variables 
-and how do we enforce that every type variable has at least one value it can 
+and how we enforce that every type variable has at least one value it can 
 take on along with enforcing that our ``permits'' constraints hold.  We will 
 discuss the high-level implementation, omitting some implementation details 
 and technicalities.
@@ -320,7 +331,7 @@ further used by the user.
 
 As discussed in section \ref{sec:types-and-constraints},
 each constraint contains the left part, which is either a type variable
-or it references a return value/argument of a procedure that can be taken on by the
+or a reference to a return value or argument of a procedure that can be taken on by the
 type variable passed.
 In the latter case, we have to recursively walk the type variable
 mapping to obtain a type variable, if possible.
@@ -404,14 +415,14 @@ however introduces some complexity as described above.
 
 \subsection{Substitution}
 
-When an equals constraint that boils down to setting equality between two different
-type variables, we compute the intersection of the types, set the mapping from the
+When an equals constraint boils down to setting equality between two different
+type variables, we compute the intersection of the types, and set the mapping from the
 left type variable to the new type in our mapping.
 Rather than doing the same for the second type variable, we substitute the left type
 variable for the right.
 The substitutions have to be done everywhere, that is both in mapping and in all constraints.
 The advantage of doing this is that it essentially removes the current constraint
-or makes it trivial, and all constraint referencing one of the type variables will
+or makes it trivial, and all constraints referencing one of the type variables will
 now affect both.
 Making these substitutions thus speeds up convergence, as the number of constraints
 is effectively reduced by doing so.\\
@@ -509,11 +520,11 @@ areas clearly highlighted.  An appealing approach would be to integrate
 Tscheme with emacs, with a macro allowing users to run a section of code 
 through Tscheme's analyzer and then use the results to highlight the code in 
 place.  Emacs integration could also allow the user to select variables to 
-query using emacs markers, rather than writing ``query'' into the code.
+query using emacs markers, rather than writing \T{query} into the code.
 Conveniences such as these would be an important part of transitioning Tscheme 
-as an academic project to more consumer-oriented software.  
+as an academic project to more consumer-oriented software.
 
-\subsection{Conclusions}
+\section{Conclusions}
 Tscheme exemplifies a modular approach to code analysis.  The user's code (like
 all Scheme code) consists of a list of subexpressions, and constraints are
 generated by iterating linearly through that list (perhaps with recursion into
@@ -524,6 +535,6 @@ did (e.g., justifying the bindings of code variables to type variables).  It
 would be interesting to explore whether the system can be extended while keeping
 its modular design.  In any case, our hope is that a hint-based code analysis
 system like Tscheme could one day save programmers a significant amount of time
-and frustration.
+and frustration without forcing them to write their code in a different way.
 
 \end{document}
