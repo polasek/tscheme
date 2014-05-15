@@ -63,10 +63,18 @@
                    left *requires* right (finite-set id)))))
     (list (rmake 'number (type:make-number) -1)
           (rmake 'string (type:make-string) -2)
-          (rmake 'plus   (type:make-procedure 'number '(number number)) -3)
-          (rmake 'minus  (type:make-procedure 'number '(number number)) -4)
+          (rmake 'plus   (type:make-procedure 'number  '(number number)) -3)
+          (rmake 'minus  (type:make-procedure 'number  '(number number)) -4)
+          (rmake 'times  (type:make-procedure 'number  '(number number)) -5)
+          (rmake 'divide (type:make-procedure 'number  '(number number)) -6)
+          (rmake 'integer-equal?
+                 (type:make-procedure 'boolean '(number number)) -7)
+          (rmake 'integer-less?
+                 (type:make-procedure 'boolean '(number number)) -8)
+          (rmake 'integer-greater?
+                 (type:make-procedure 'boolean '(number number)) -9)
           (rmake 'string-append
-                         (type:make-procedure 'string '(string string)) -5))))
+                 (type:make-procedure 'string  '(string string)) -10))))
 
 
 ;;; "Query map" -- a simple human readable key-value store.  We don't need
@@ -104,8 +112,13 @@
 ;;; use in production
 (define *base-cvmap*
   '((+ plus)
-    (string-append string-append)
     (- minus)
+    (* times)
+    (/ divide)
+    (= integer-equal?)
+    (< integer-less?)
+    (> integer-greater?)
+    (string-append string-append)
     (|#!unspecific| unspecific)))
 
 
