@@ -383,9 +383,31 @@ with different type variables for the same reason as above.
 
 \section{Development process}
 
-%work division, description of the general process
+We spent several weeks at the beginning of the project simply discussing the 
+nature of the problem and working through code samples by hand.  We decided 
+early on to take a code-analysis approach over any sort of strict typing, but 
+it was only after much experimentation that we decided to make a 
+constraint-based implementation.  We favored this method because of its 
+modularity - the process of generating constraints is completely separate from 
+the process of unifying constraints and refining types.  We worked together to 
+create the shared interface for generating types and constraints
+(see {\tt types.scm} and {\tt constraints.scm}), and then were able to divide 
+up the rest of the work.  Ben wrote most of {\tt get-constraints.scm} and 
+{\tt \rewrite.scm}, while Jan and Aaron worked together on
+{\tt analyze-constraints.scm}.  Since finishing the basic implementation we 
+have been continually refining the code and writing tests to find cases it has 
+trouble handling (most of which we've been able to accommodate).
 
 \section{Discussion and future work}
+
+Tscheme in its current form is best thought of as a framework for 
+type-analysis in Scheme.  There are several directions we could expand to make 
+a production-ready system, all of which have their own benefits and costs.  
+One of the limitations of our design is its ability to analyse branches of 
+conditionals.  The conservative approach we've taken allows us to say very 
+little about the branches and the value of a conditional.  An alternative 
+approach that might be more appropriate for a production system would be to 
+assume any branch could be taken 
 
 %TODO Ben - branching, reporting, UI
 % Having the constraint generator keep track of user code variable bindings
