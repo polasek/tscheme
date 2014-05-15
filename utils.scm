@@ -23,6 +23,7 @@
 |#
 
 ;; TODO: Make generic
+;; On second thought: this is good enough
 (define (general-sort lst)
   (define (boolean<? a b) (not (and a b)))
   (cond

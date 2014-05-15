@@ -206,20 +206,6 @@
                (dedup (general-sort (list-transform-positive elts type-pred)))))
             type:predicates))))
 
-;; TODO: Check this
-#|
-(pp (type:finite-set 'a 'b 9 'a 1 2 3 3 2 1 #f 32 1 2 3))
-(pp (type:finite-set "a b"))
-;; #[type 65]
-;; (boolean (finite-set #f))
-;; (number (finite-set 1 2 3 9 32))
-;; (char none)
-;; (string none)
-;; (symbol (finite-set a b))
-;; (pair none)
-;; (procedure none)
-|#
-
 
 ;;; Intersecting types
 

@@ -156,14 +156,10 @@
           (tv&cvmap:tv tv&cvmap-after-body)
           expr))
 
-      ;; TODO remove print statement
       (let ((ultimate-cvmap (cvmap:pop-scope-barrier
                               (tv&cvmap:cvmap tv&cvmap-after-body))))
-        ;(write "Here is ultimate cvmap: ")
-        ;(for-each (lambda (thing) (display "  ") (write-line thing))
-        ;          ultimate-cvmap)
-      (tv&cvmap:make lambda-tv
-                     ultimate-cvmap)))))
+        (tv&cvmap:make lambda-tv
+                       ultimate-cvmap)))))
   
 (defhandler tscheme:process-expr tscheme:process-lambda lambda?)
 
