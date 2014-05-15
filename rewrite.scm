@@ -1,6 +1,7 @@
 ;;;; Rewriter
 ;;; Translates a reasonable subset of Scheme into the subset accepted by
-;;; get-constraints
+;;; get-constraints.  Specifically, wraps bodies of lambdas in begins, rewrites
+;;; let statements, rewrites conds.
 ;;;
 ;;; Warning: This is boring code!
 ;;;
@@ -198,4 +199,18 @@
     (map rw:rewrite (rw:application-operands expr))))
   
 
+#|
+(pp (rw:rewrite
+      '(let ((x (begin
+                  (+ 3 (query qname 4))
+                  (let ((y 7)) "a"))))
+         (define (g z) z)
+         (cond ((= 3 5) #t)
+               ((= 4 'abcde) #f)))))
 
+; -> ((lambda (x)
+;       (begin (define (g z) z)
+;              (cond ((= 3 5) #t) ((= 4 'abcde) #f))))
+;     (begin (+ 3 (query qname 4))
+;            ((lambda (y) (begin "a")) 7)))
+|#

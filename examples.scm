@@ -1,3 +1,6 @@
+;;;; Examples
+;;;
+;;; Time to show off what our analyzer can do!
 
 (define test1-should-fail
   '(begin
@@ -66,8 +69,8 @@
 
 (define analysis (tscheme:analyze fact-test-should-succeed))
 
-(car analysis)
-
+analysis
+; Gives a bunch of deductions
 
 
 (define fact-test-should-fail
@@ -86,5 +89,82 @@
 (define analysis (tscheme:analyze fact-test-should-fail))
 
 (car analysis)
+;Value: failure
 
+
+(define delayed-binding-test-succeed
+  '(begin
+     (define f (lambda () (query x x)))
+     (define x 3)))
+
+(define analysis (tscheme:analyze delayed-binding-test-succeed))
+
+(query-lookup 'x analysis)
+;(
+;   x3
+;   ((number (finite-set 3)))
+;   (
+;      CONSTRAINT[(3)](x4 equals ((number (finite-set 3)))) FROM CODE 3
+;      CONSTRAINT[(4)](x4 equals x3) LEFT (delayed-binding-of x)
+;   )
+;)
+
+
+(define shadowing-test-succeed
+  '(begin
+     (define g (lambda () (begin x)))
+     (lambda (x)
+       (+ x 5))
+     (define x "a")
+     (string-append (g) "e")))
+
+(define analysis (tscheme:analyze shadowing-test-succeed))
+
+analysis
+; (() (a bunch of deductions))
+
+
+;; This is pretty subtle.  Because x within g ends up getting bound to the
+;; memory location that gets filled with "a", having (+ x 1) inside the body of
+;; g is a problem, assuming the programmer expects to be able to ever run g.
+(define shadowing-test-fail
+  '(begin
+     (define g (lambda () (+ x 1)))
+     (lambda (x)
+       (+ x 5))
+     (define x "a")
+     (string-append (g) "e")))
+
+(define analysis (tscheme:analyze shadowing-test-fail))
+
+analysis
+; (failure x4 ([constraint] ...))
+
+
+(define mutual-recursion-test-succeed
+  '(begin
+     (define f (lambda (x)
+                 (begin
+                   (g "a")
+                   (+ x 7))))
+     (define g (lambda (y)
+                 (begin
+                   (f 4))))))
+
+(define analysis (tscheme:analyze mutual-recursion-test-succeed))
+;; Succeeds
+
+(define mutual-recursion-test-fail
+  '(begin
+     (define f (lambda (x)
+                 (begin
+                   (g "a")
+                   (+ x 7))))
+     (define g (lambda (y)
+                 (begin
+                   (f y))))))
+
+(define analysis (tscheme:analyze mutual-recursion-test-fail))
+;; Failure: g has to able to accept "a", so f has to be able to accept "a", but
+;; it doesn't
 

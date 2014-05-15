@@ -8,7 +8,8 @@
 ;;; but never look at them all at once; thus a hash table is appropriate for
 ;;; the constraint table.  There will typically be only a few queries, and the
 ;;; user will often want to look at all the query results, so an association
-;;; list is best suited to the qmap.
+;;; list is best suited to the qmap.  The cvmap is more complicated; see
+;;; cvmap.scm for the full explanation there.
 
 
 ;;; "Constraint tables" -- a key-value store supporting insertion and lookup.
@@ -90,36 +91,8 @@
 (define (add-to-qmap key val)
   (set! *query-map* (qmap:bind *query-map* key val)))
 
-
-;;; "Cvmap" -- A mapping of code variables to type variables.
-
-(define (cvmap:make)
-  *base-cvmap*)
-
-(define (cvmap:bind cvmap key val)
-  (cons `(,key ,val) cvmap))
-
-(define (cvmap:lookup key cvmap)
-  (let ((record (assoc key cvmap)))
-   (if record
-     (cadr record)
-     (begin
-       (display "Warning: failed to look up key in cvmap: ")
-       (pp key)
-       #f))))
-
-;;; Just as with base-constraints, this catalog would need to be extended for
-;;; use in production
-(define *base-cvmap*
-  '((+ plus)
-    (- minus)
-    (* times)
-    (/ divide)
-    (= integer-equal?)
-    (< integer-less?)
-    (> integer-greater?)
-    (string-append string-append)
-    (|#!unspecific| unspecific)))
+;;; "Code variable map" -- the cvmap data structure is pretty complicated
+(load "cvmap")
 
 
 ;;; Often we will want to pass around two pieces of information: a type

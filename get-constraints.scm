@@ -5,10 +5,6 @@
 (define *the-constraints* (make-constraint-table))
 (define *query-map* '())
 
-(define (query-lookup x analysis)
-  (print-recursive
-    (assoc (cadr (assoc x (car analysis))) (cadr analysis))))
-
 ;;; Reads in an expression.  Returns a table of constraints generated and a
 ;;; mapping of query names to type variables.
 (define (get-constraints-for expr)
@@ -57,6 +53,12 @@
                                     reason-ids))))
                      tv->type&reason-ids)))
              (list qmap tv->type&reasons))))))))
+
+;;; Helper for lookup up a queried expression in the analysis returned by
+;;; tscheme:analyze
+(define (query-lookup query-name analysis)
+  (print-recursive
+    (assoc (cadr (assoc query-name (car analysis))) (cadr analysis))))
 
 
 
@@ -116,17 +118,15 @@
 
 ;;; Handler for lambda expressions
 (define (tscheme:process-lambda expr cvmap)
-  (let ((lambda-tv (fresh-procvar)) ; points to the procedure object created by
-                                    ; the lambda
-        (ret-tv (fresh-retvar))   ; the return type of the procedure
-        (arg-tvs '())             ; the argument types of the procedure
-        (outer-cvmap cvmap)    ; cvmap of the scope outside the lambda, will
-                               ; not be mutated
-        (inner-cvmap cvmap))   ; cvmap of the scope inside the lambda, will be
-                               ; mutated to incorporate the formal parameters
-                               ; of the lambda, as well as any internal
-                               ; definitions (the pointer to inner-cvmap, not
-                               ; the object itself, is mutated).
+  (let* ((lambda-tv (fresh-procvar)) ; points to the procedure object created by
+                                     ; the lambda
+         (ret-tv (fresh-retvar))   ; the return type of the procedure
+         (arg-tvs '())             ; the argument types of the procedure
+         (outer-cvmap cvmap)    ; cvmap of the scope outside the lambda
+         (inner-cvmap (cvmap:push-scope-barrier outer-cvmap)))
+                                ; cvmap of the scope inside the lambda, will
+                                ; soon be mutated to incorporate bindigs of the
+                                ; formal parameters of the lambda
     ;; Build up arg-tvs and bind the formal parameters in inner-cvmap
     (let lp ((remaining-args (lambda-arglist expr)))
      (if (null? remaining-args)
@@ -147,15 +147,23 @@
 
     ;; Recurse into the body, and say what we can about the return type of the
     ;; last expression (again, we assume that the body is wrapped in a begin)
-    (add-constraint
-      (constraint:make-require
-        ret-tv
-        (tv&cvmap:tv (tscheme:process-expr (lambda-body expr) inner-cvmap))
-        expr))
+    (let ((tv&cvmap-after-body (tscheme:process-expr
+                                 (lambda-body expr)
+                                 inner-cvmap)))
+      (add-constraint
+        (constraint:make-require
+          ret-tv
+          (tv&cvmap:tv tv&cvmap-after-body)
+          expr))
 
-    ;; We use the outer cvmap because we are returning to the scope outside the
-    ;; body of our lambda.
-    (tv&cvmap:make lambda-tv outer-cvmap)))
+      ;; TODO remove print statement
+      (let ((ultimate-cvmap (cvmap:pop-scope-barrier
+                              (tv&cvmap:cvmap tv&cvmap-after-body))))
+        ;(write "Here is ultimate cvmap: ")
+        ;(for-each (lambda (thing) (display "  ") (write-line thing))
+        ;          ultimate-cvmap)
+      (tv&cvmap:make lambda-tv
+                     ultimate-cvmap)))))
   
 (defhandler tscheme:process-expr tscheme:process-lambda lambda?)
 

@@ -1,5 +1,14 @@
 ;;; Helpers for printing things in a human-readable format
 
+;; Constraints with negative ids are built-in
+(define (built-in-constraint? item)
+  (and (constraint? item)
+       (every negative? (finite-set-elts (constraint:ids item)))))
+
+(define (not-built-in-constraint? item)
+  (not (built-in-constraint? item)))
+
+
 (define (display-constraint constraint)
   (display "CONSTRAINT[")
   (write (finite-set-elts (constraint:ids constraint)))
@@ -40,9 +49,6 @@
   (display-constraint constraint)
   (newline))
 
-#|
-(print-constraint (constraint:make-require 'a 'b))
-|#
 
 (define (print-type t)
   (write
@@ -78,3 +84,5 @@
           ((type? y) (display prefix) (print-type y) (newline))
           (else (display prefix) (write-line y))))
   (print-recursive-with-prefix x ""))
+
+
