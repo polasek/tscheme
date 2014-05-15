@@ -51,3 +51,20 @@
 ;)
 
 
+(define fact-test
+  (rw:rewrite
+    '(define (fact n)
+       (if (< n 2)
+           n
+           (* n (fact (- n 1)))))))
+
+;; Show rewriting
+(pp fact-test)
+;(define fact
+;  (lambda (n)
+;    (begin (if (< n 2) n (* n (fact (- n 1)))))))
+
+(define analysis (tscheme:analyze fact-test))
+
+
+
