@@ -53,6 +53,14 @@
                      (eq? (cadr elt) *none*))))
               (cdr (record->list t)))))
 
+(define (print-substitution s)
+  (write (sub:old s))
+  (display " -> ")
+  (write (sub:new s))
+  (display " ")
+  (write (finite-set-elts (sub:ids s)))
+  (newline))
+
 (define (print-recursive x)
   (define (print-recursive-with-prefix y prefix)
     (cond ((list? y)
