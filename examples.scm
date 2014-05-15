@@ -41,7 +41,7 @@
 (car analysis)
 ;Value: ((my_x x1))
 
-(print-recursive (assoc 'x1 (cadr analysis)))
+(query-lookup 'my_x analysis)
 ;(
 ;   x1
 ;   ((number (finite-set 4)))

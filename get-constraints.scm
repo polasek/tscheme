@@ -5,6 +5,9 @@
 (define *the-constraints* (make-constraint-table))
 (define *query-map* '())
 
+(define (query-lookup x analysis)
+  (print-recursive
+    (assoc (cadr (assoc x (car analysis))) (cadr analysis))))
 
 ;;; Reads in an expression.  Returns a table of constraints generated and a
 ;;; mapping of query names to type variables.
