@@ -8,7 +8,7 @@
     (old sub:old)
     (new sub:new)
     (ids sub:ids))
-;;
+
 ;;Compose two substitution maps, so that for example running
 ;; (multi-substitute-into-environment
 ;;   (multi-substitute-into-environment environment subsA) subsB)
@@ -49,22 +49,45 @@
       subs))
 
 #|
-(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
-                                                   (e f ,(finite-set 3)))
-                           `((g h ,(finite-set 4)) (i j ,(finite-set 5))
-                                                   (k l ,(finite-set 6)))))
-;((a b (finite-set 1)) (c d (finite-set 2)) (e f (finite-set 3))
-; (g h (finite-set 4)) (i j (finite-set 5)) (k l (finite-set 6)))
-(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
-                                                   (e f ,(finite-set 3)))
-                           `((b h ,(finite-set 4)) (c j ,(finite-set 5))
-                                                   (f l ,(finite-set 6)))))
-;((a h (finite-set 1 4)) (c d (finite-set 2)) (e l (finite-set 3 6))
-;                        (b h (finite-set 4)) (f l (finite-set 6)))
-(pp (compose-substitutions `((a b ,(finite-set 1)) (c d ,(finite-set 2))
-                                                   (e f ,(finite-set 3)))
-                           `((a h ,(finite-set 4)) (c j ,(finite-set 5))
-                                                   (e l ,(finite-set 6)))))
-;((a b (finite-set 1)) (c d (finite-set 2)) (e f (finite-set 3)))
+(for-each
+  print-substitution
+  (compose-substitutions (list (substitution:make 'a 'b (finite-set 1))
+                               (substitution:make 'c 'd (finite-set 2))
+                               (substitution:make 'e 'f (finite-set 3)))
+                         (list (substitution:make 'g 'h (finite-set 4))
+                               (substitution:make 'i 'j (finite-set 5))
+                               (substitution:make 'k 'l (finite-set 6)))))
+;a -> b (1)
+;c -> d (2)
+;e -> f (3)
+;g -> h (4)
+;i -> j (5)
+;k -> l (6)
+
+(for-each
+  print-substitution
+  (compose-substitutions (list (substitution:make 'a 'b (finite-set 1))
+                               (substitution:make 'c 'd (finite-set 2))
+                               (substitution:make 'e 'f (finite-set 3)))
+                         (list (substitution:make 'b 'h (finite-set 4))
+                               (substitution:make 'c 'j (finite-set 5))
+                               (substitution:make 'f 'l (finite-set 6)))))
+;a -> h (1 4)
+;c -> d (2)
+;e -> l (3 6)
+;b -> h (4)
+;f -> l (6)
+
+(for-each
+  print-substitution
+  (compose-substitutions (list (substitution:make 'a 'b (finite-set 1))
+                               (substitution:make 'c 'd (finite-set 2))
+                               (substitution:make 'e 'f (finite-set 3)))
+                         (list (substitution:make 'a 'h (finite-set 4))
+                               (substitution:make 'c 'j (finite-set 5))
+                               (substitution:make 'e 'l (finite-set 6)))))
+;a -> b (1)
+;c -> d (2)
+;e -> f (3)
 |#
 

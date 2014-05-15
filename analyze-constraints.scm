@@ -109,22 +109,6 @@
 (define (multi-substitute-into-environment environment subs)
   (fold-left substitute-into-environment environment subs))
 
-;; XXX
-(define (substitute-constraints old new ids constraints)
-  (map (lambda (c) (substitute-constraint old new ids c)) constraints))
-
-;; TODO: New tests
-#|
-(pp (cadr (substitute-constraints
-            'a 'b `(,(constraint:make 'a 'equals 'b)
-                    ,(constraint:make 'b 'equals 'a)))))
-;;#[constraint 11]
-;;(left b)
-;;(relation equals)
-;;(right b)
-;;;Unspecified return value
-|#
-
 
 ;; First argument is a pair of environment and current substitutions,
 ;; the second one is a constraint which hasn't yet been substituted into.
@@ -198,18 +182,6 @@
                            newConstraints))))))
   enforce-constraint)
 
-;TODO: New tests
-#|
-(pp (enforce-constraint '() '() (constraint:make 'a *equals* 'b)))
-(pp (map record->list
-         (cadr (enforce-constraint
-                 `(,(constraint:make 'b *equals* (type:make-boolean)))
-                 '()
-                 (constraint:make 'a *equals* 'b)))))
-
-(pp (constraint:make 'a *equals* 'b))
-|#
-
 ;;Enforce constraints until fixed point is reached,
 (define (enforce-all-constraints constraints fail)
   (define enforce-constraint (enforce-constraint-with-fail-continuation fail))
@@ -224,60 +196,4 @@
                                  (multi-substitute-constraint c (cadr env-subs)))
 			       constraints)
 			  (car env-subs))))))
-#|
-(define test1
-  '(lambda (x y)
-     (begin
-       (+ x 5)
-       (string-append y "a b"))))
 
-(define prestest-success
-  '((lambda (x y)
-      (begin
-        (+ x y)
-        "done"))
-    3
-    4))
-
-(define prestest-fail
-  '((lambda (x y)
-      (begin
-        (+ x y)
-        "done"))
-    3
-    "a"))
-
-(pp
-(call-with-current-continuation
-  (lambda (k)
-    (let* ((constraints (car (get-constraints-for prestest-fail)))
-           (fail-continuation (lambda (v ids)
-                                (for-each print-constraint constraints)
-                                (k (list v ids))))
-           (p (enforce-all-constraints constraints fail-continuation)))
-      (for-each print-constraint (cadr p))
-      (for-each (lambda (m)
-                  (pp (list (car m) (record->list (caadr m)) (cadadr m)))
-                  (read))
-                (car p))
-      (for-each print-constraint (cadr p))))))
-
-(let ((p (enforce-all-constraints
-           `(,(constraint:make 'b *equals* (type:make-boolean))
-             ,(constraint:make 'a *equals* 'b)))))
-  (map print-constraint (cadr p))
-  (map (lambda (m)
-         (pp (list (car m) (record->list (caadr m)) (cadadr m)))
-         (read))
-       (car p))
-  (map print-constraint (cadr p)))
-
-(enforce-all-constraints (car (get-constraints-for prestest-fail)))
-(enforce-all-constraints (car (get-constraints-for prestest-success)))
-
-(print-recursive (car (get-constraints-for test1)))
-
-(enforce-all-constraints
-                 `(,(constraint:make 'b *equals* (type:make-boolean))
-                   ,(constraint:make 'a *equals* 'b)))
-|#

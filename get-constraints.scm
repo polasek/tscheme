@@ -5,6 +5,9 @@
 (define *the-constraints* (make-constraint-table))
 (define *query-map* '())
 
+(define (query-lookup x analysis)
+  (print-recursive
+    (assoc (cadr (assoc x (car analysis))) (cadr analysis))))
 
 ;;; Reads in an expression.  Returns a table of constraints generated and a
 ;;; mapping of query names to type variables.
@@ -289,34 +292,3 @@
               (cdr remaining-args)
               arg-value-cvmap))))))
 
-
-#|
-(define test103
-  '(begin
-     (define x 4)
-     (define y
-       (if (query my_x x)
-         "a"
-         #\e))
-     (+ y 7)
-     (string-append y "e")))
-
-(define analysis (tscheme:analyze test103))
-
-
-(define test104
-  '(begin
-     (define x 4)
-     (define y
-       (if (query my_x x)
-         "a"
-         #\e))
-     (string-append y "e")))
-
-(define analysis (tscheme:analyze test104))
-
-(car analysis)
-
-(print-recursive
-  (assoc 'x1 (cadr analysis)))
-|#
