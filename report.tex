@@ -393,7 +393,7 @@ the process of unifying constraints and refining types.  We worked together to
 create the shared interface for generating types and constraints
 (see {\tt types.scm} and {\tt constraints.scm}), and then were able to divide 
 up the rest of the work.  Ben wrote most of {\tt get-constraints.scm} and 
-{\tt \rewrite.scm}, while Jan and Aaron worked together on
+{\tt rewrite.scm}, while Jan and Aaron worked together on
 {\tt analyze-constraints.scm}.  Since finishing the basic implementation we 
 have been continually refining the code and writing tests to find cases it has 
 trouble handling (most of which we've been able to accommodate).
@@ -402,12 +402,51 @@ trouble handling (most of which we've been able to accommodate).
 
 Tscheme in its current form is best thought of as a framework for 
 type-analysis in Scheme.  There are several directions we could expand to make 
-a production-ready system, all of which have their own benefits and costs.  
+a production-ready system, all of which have their own benefits and costs.
+
+\subsection{Branching}
 One of the limitations of our design is its ability to analyse branches of 
 conditionals.  The conservative approach we've taken allows us to say very 
 little about the branches and the value of a conditional.  An alternative 
 approach that might be more appropriate for a production system would be to 
-assume any branch could be taken 
+assume any branch could be taken.  This would however require an extensive
+overhaul of the design:
+\begin{itemize}
+  \item Each possible computation path would carry a separate set of
+    constraints, and there is a guaranteed error if and only if all branches
+    have contradictory constraint sets.  The unifier would therefore have to
+    consider many different sets of constraints (exponential in the number of
+    branching instructions in the user code).
+    
+  \item Our data structures would have to be redesigned.  The data structure
+    holding the consraints would have to be hierarchical, rather than a flat
+    table.
+\end{itemize}
+
+\subsection{Reporting / User interface}
+At present, \T{tscheme:analyze} reports (upon success) the deduced type of each
+type variable, along with the constraints that were used to deduce each type.
+Also returned is a mapping which gives the type variables corresponding to each
+of the user's queries.  In this way, the user can look up the type of each
+queried expression.  (Upon failure, the type variable that produced the
+contradiction is returned, along with a set of constraints from which the
+contradiction was derived.)
+
+Each constraint contains the user code that produced it, so that the user can
+easily find the parts of his code that may be problematic.  While this is often
+quite useful, more sophisticated reporting would be desirable:
+
+\begin{itemize}
+  \item Suppose the user analyzes the code \T{(define x 4)}.  The reported type
+    of \T{x} is, correctly, the singleton $\{\mathtt{4}\}$.  But the user code
+    used to justify this constraint is simply \T{4}.  We would like the user
+    code to be \T{(define x 4)}.  What we're really saying is that we'd like to
+    see not only reasons that deductions about type variables were made, but
+    also reasons that code variables were bound to type variables.  This would
+    require significant reworking of the constraint generator, if not a
+    breaking-down of the divide between constraint generation and unification.
+\end{itemize}
+
 
 %TODO Ben - branching, reporting, UI
 % Having the constraint generator keep track of user code variable bindings
