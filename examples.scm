@@ -51,7 +51,7 @@
 ;)
 
 
-(define fact-test
+(define fact-test-should-succeed
   (rw:rewrite
     '(define (fact n)
        (if (< n 2)
@@ -59,12 +59,32 @@
            (* n (fact (- n 1)))))))
 
 ;; Show rewriting
-(pp fact-test)
+(pp fact-test-should-succeed)
 ;(define fact
 ;  (lambda (n)
 ;    (begin (if (< n 2) n (* n (fact (- n 1)))))))
 
-(define analysis (tscheme:analyze fact-test))
+(define analysis (tscheme:analyze fact-test-should-succeed))
 
+(car analysis)
+
+
+
+(define fact-test-should-fail
+  (rw:rewrite
+    '(define (fact n)
+       (if (< n "2")
+           n
+           (* n (fact (- n 1)))))))
+
+;; Show rewriting
+(pp fact-test-should-fail)
+;(define fact
+;  (lambda (n)
+;    (begin (if (< n "2") n (* n (fact (- n 1)))))))
+
+(define analysis (tscheme:analyze fact-test-should-fail))
+
+(car analysis)
 
 
