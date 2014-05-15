@@ -94,8 +94,8 @@
   (define (else-clause? clause) (eq? (predicate clause) 'else))
   (define (predicate clause) (car clause))
   (define (actions clause)
-
-  (rw:sequence->begin (cdr clause)))
+    (rw:sequence->begin (cdr clause)))
+  
   (define (expand clauses)
     (cond ((no-clauses? clauses)
            '|#!unspecific|)
